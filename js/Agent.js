@@ -110,7 +110,8 @@ class Agent {
     this.vx = (this.vx + ax * CONFIG.ACCELERATION) * CONFIG.FRICTION;
     this.vy = (this.vy + ay * CONFIG.ACCELERATION) * CONFIG.FRICTION;
 
-    const maxSpd = CONFIG.MAX_SPEED * (this.carryingWall ? CONFIG.WALL_CARRY_SPEED : 1);
+    const topSpeed = this.type === 'predator' ? CONFIG.PRED_MAX_SPEED : CONFIG.PREY_MAX_SPEED;
+    const maxSpd = topSpeed * (this.carryingWall ? CONFIG.WALL_CARRY_SPEED : 1);
     const spd    = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (spd > maxSpd) {
       this.vx = (this.vx / spd) * maxSpd;
@@ -127,7 +128,7 @@ class Agent {
 
     if (this._wallCooldown > 0) {
       this._wallCooldown--;
-    } else if (interact > 0.5) {
+    } else if (interact > CONFIG.WALL_INTERACT_THRESHOLD) {
       const spd   = this.speed;
       const angle = spd > 0.3 ? Math.atan2(this.vy, this.vx) : (this.facingLeft ? Math.PI : 0);
       const { col, row } = maze.getCellAt(

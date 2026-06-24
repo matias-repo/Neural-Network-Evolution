@@ -124,8 +124,9 @@ class Maze {
     const dr = Math.sign(r2 - r1);
     const dc = Math.sign(c2 - c1);
     let r = r1, c = c1;
-    while (r !== r2 + dr || c !== c2 + dc) {
+    while (true) {
       this.grid[r][c] = 1;
+      if (r === r2 && c === c2) break;
       if (r !== r2) r += dr;
       if (c !== c2) c += dc;
     }
@@ -167,21 +168,17 @@ class Maze {
   }
 
   _presetSpiral() {
-    const { cols: C, rows: R } = this;
-    const layers = 3;
-    for (let l = 0; l < layers; l++) {
-      const pad = 3 + l * 6;
-      const top = pad, bot = R - 1 - pad, left = pad, right = C - 1 - pad;
-      if (top >= bot || left >= right) break;
-      // Top wall with right gap
-      this._wall(top, left, top, right - 4);
-      // Right wall with bottom gap
-      this._wall(top + 4, right, bot, right);
-      // Bottom wall with left gap
-      this._wall(bot, left + 4, bot, right - 1);
-      // Left wall with top gap (open)
-      this._wall(top, left, bot - 4, left);
-    }
+    // Ring: central rectangle with a doorway on each side.
+    // Fits the narrow 18-col grid where concentric spirals don't fit.
+    this._wall(8,  5, 8,  12);   // top edge
+    this._wall(21, 5, 21, 12);   // bottom edge
+    this._wall(8,  5, 21,  5);   // left edge
+    this._wall(8, 12, 21, 12);   // right edge
+    // 3-cell doorway centred on each side
+    this._gap(8,  8, 3, true);   // top open: cols 8-10
+    this._gap(21, 8, 3, true);   // bottom open: cols 8-10
+    this._gap(13, 5, 3, false);  // left open: rows 13-15
+    this._gap(13,12, 3, false);  // right open: rows 13-15
   }
 
   _presetZigzag() {

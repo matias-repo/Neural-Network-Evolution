@@ -1,4 +1,4 @@
-const VERSION = '0.5';
+const VERSION = '0.6';
 
 const CONFIG = {
   // Grid – portrait 18×30 at 20 px = 360×600
@@ -8,7 +8,9 @@ const CONFIG = {
 
   // Agent physics
   AGENT_RADIUS: 7,
-  MAX_SPEED: 3.5,
+  PRED_MAX_SPEED: 4.2,   // predator is faster so it can actually catch prey
+  PREY_MAX_SPEED: 3.5,
+  MAX_SPEED: 4.2,        // normalization reference for NN velocity inputs (= pred top speed)
   ACCELERATION: 0.55,
   FRICTION: 0.80,
 
@@ -51,9 +53,10 @@ const CONFIG = {
   PRED_PROXIMITY_WEIGHT: 0.15,
 
   // Wall interaction
-  WALL_INTERACT_COOLDOWN: 20,   // sim-frames between pickups / placements
-  WALL_CARRY_SPEED: 0.65,       // max-speed multiplier while holding a wall
-  WALL_PICKUP_BONUS: 0,         // direct bonus removed — strategic use earns fitness through primary objectives
+  WALL_INTERACT_COOLDOWN: 20,    // sim-frames between pickups / placements
+  WALL_CARRY_SPEED: 0.65,        // max-speed multiplier while holding a wall
+  WALL_INTERACT_THRESHOLD: 0.9,  // NN interact output must exceed this to trigger — prevents noise-driven pickups
+  WALL_PICKUP_BONUS: 0,          // direct bonus removed — strategic use earns fitness through primary objectives
 
   // Canvas
   CANVAS_W: 360,

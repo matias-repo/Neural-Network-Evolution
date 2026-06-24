@@ -143,7 +143,8 @@ class Renderer {
     }
 
     // Slow animation down when barely moving
-    const movingFast = agent.speed > CONFIG.MAX_SPEED * 0.25;
+    const topSpeed   = isPrey ? CONFIG.PREY_MAX_SPEED : CONFIG.PRED_MAX_SPEED;
+    const movingFast = agent.speed > topSpeed * 0.25;
     const effectiveDur = movingFast ? dur : dur * 3;
 
     const frameIdx = Math.floor(totalFrames / effectiveDur) % frames.length;
