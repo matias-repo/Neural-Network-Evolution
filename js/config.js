@@ -18,7 +18,7 @@ const CONFIG = {
   // Episode
   EPISODE_FRAMES: 500,   // fewer frames → faster generations
   MIN_START_DIST: 150,   // scaled for narrower canvas
-  CATCH_DIST: 14,
+  CATCH_DIST: 20,
 
   // Evolution
   POP_SIZE: 20,          // fewer episodes per gen → faster evolution cycles

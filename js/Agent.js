@@ -71,8 +71,8 @@ class Agent {
   // ── Physics update ────────────────────────────────────────────────────────
   update(maze, opponent) {
     const inputs = this.sense(maze, opponent);
-    const [ax, ay] = this.nn.forward(inputs);
-    this.lastOutputs = [ax, ay];
+    const [ax, ay, interact] = this.nn.forward(inputs);
+    this.lastOutputs = [ax, ay, interact];
 
     this.vx = (this.vx + ax * CONFIG.ACCELERATION) * CONFIG.FRICTION;
     this.vy = (this.vy + ay * CONFIG.ACCELERATION) * CONFIG.FRICTION;
@@ -98,7 +98,7 @@ class Agent {
     // Wall interaction (output index 2)
     if (this._wallCooldown > 0) {
       this._wallCooldown--;
-    } else if ((this.lastOutputs[2] || 0) > 0.5) {
+    } else if (interact > 0.5) {
       const spd   = this.speed;
       const angle = spd > 0.3 ? Math.atan2(this.vy, this.vx) : (this.facingLeft ? Math.PI : 0);
       const { col, row } = maze.getCellAt(

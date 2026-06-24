@@ -15,6 +15,7 @@ sim.onSave = (data) => self.postMessage({ type: 'save', simState: data });
 let paused        = true;
 let stepsPerBatch = 1;
 let lastPostMs    = 0;
+let lastTickMs    = 0;
 
 self.onmessage = ({ data: msg }) => {
   switch (msg.type) {
@@ -88,10 +89,16 @@ function flush(includeMaze) {
 }
 
 function tick() {
-  if (!paused) {
-    for (let i = 0; i < stepsPerBatch; i++) sim._step();
-  }
   const now = Date.now();
+  if (!paused) {
+    // Speeds < 100 are rate-limited to ~60 batches/sec to match the old RAF cadence.
+    // Speeds >= 100 run as fast as the CPU allows (the whole point of the worker).
+    const throttled = stepsPerBatch < 100;
+    if (!throttled || now - lastTickMs >= 16) {
+      for (let i = 0; i < stepsPerBatch; i++) sim._step();
+      lastTickMs = now;
+    }
+  }
   if (now - lastPostMs >= 16) {
     flush(false);
     lastPostMs = now;
