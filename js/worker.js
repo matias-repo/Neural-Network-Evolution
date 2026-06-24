@@ -44,6 +44,11 @@ let mazeShared  = null;         // Uint8Array view of mazeSAB
 let cfgOverride = null;         // layout config forwarded to episode workers
 let lastSaveMs  = 0;            // timestamp of last save; throttles saves to ≤1 per 5 s
 
+// ── Speed ─────────────────────────────────────────────────────────────────
+// 0 = turbo (no delay); positive = sim-steps to run before each 16 ms sleep
+// on the display worker. Background workers always run at full speed.
+let speedSteps  = 0;
+
 // ── Control ───────────────────────────────────────────────────────────────
 let paused      = true;
 let initialized = false;
@@ -76,7 +81,7 @@ function _handleMessage(msg) {
       break;
 
     case 'setSpeed':
-      // All cores run at max speed in parallel mode; speed setting ignored.
+      speedSteps = msg.steps ?? 0;
       break;
 
     case 'pause':
@@ -261,15 +266,16 @@ function _dispatch(wIdx) {
   if (wIdx === 0) displayEp = epIdx;
   workerBusy[wIdx] = true;
   ports[wIdx].postMessage({
-    type:     'run',
-    idx:      epIdx,
+    type:          'run',
+    idx:           epIdx,
     genId,
-    predW:    predPop[epIdx].getWeights(),
-    prey1W:   preyPop[epIdx].getWeights(),
-    prey2W:   preyPop2[epIdx].getWeights(),
-    mazeGrid: mazeShared ? null : mazeSave,  // omit when SAB is active
-    config:   cfgOverride,
-    display:  wIdx === 0,
+    predW:         predPop[epIdx].getWeights(),
+    prey1W:        preyPop[epIdx].getWeights(),
+    prey2W:        preyPop2[epIdx].getWeights(),
+    mazeGrid:      mazeShared ? null : mazeSave,
+    config:        cfgOverride,
+    display:       wIdx === 0,
+    stepsPerFrame: wIdx === 0 ? speedSteps : 0,  // only throttle the display worker
   });
 }
 

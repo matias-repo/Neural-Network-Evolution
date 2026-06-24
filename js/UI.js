@@ -6,7 +6,8 @@ class UI {
 
     this.mode = 'play';        // 'play' | 'edit' | 'pause'
     this.speedIndex = 0;       // index into SPEEDS
-    this.SPEEDS = [1, 5, 20, 100, 500, 2000, 10000, 50000, 200000];
+    // 0 = turbo (no throttle); positive = sim-steps per 16 ms render tick on display worker
+    this.SPEEDS = [0, 1, 5, 20, 100];
     this._dragAction = null;   // 'draw' | 'erase', determined on each mousedown
 
     this._mouseDown = false;
@@ -15,6 +16,7 @@ class UI {
 
     this._bindControls();
     this._bindCanvasEvents();
+    this._applySpeed();
     this.updateStats();
   }
 
@@ -210,9 +212,14 @@ class UI {
 
   _cycleSpeed() {
     this.speedIndex = (this.speedIndex + 1) % this.SPEEDS.length;
+    this._applySpeed();
+  }
+
+  _applySpeed() {
+    const s   = this.SPEEDS[this.speedIndex];
     const btn = document.getElementById('btn-speed');
-    if (btn) btn.textContent = `${this.SPEEDS[this.speedIndex]}×`;
-    this.worker.postMessage({ type: 'setSpeed', steps: this.SPEEDS[this.speedIndex] });
+    if (btn) btn.textContent = s === 0 ? '∞' : `${s}×`;
+    this.worker.postMessage({ type: 'setSpeed', steps: s });
   }
 
   _syncButtons() {

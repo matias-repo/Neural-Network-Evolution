@@ -16,16 +16,13 @@ self.onmessage = ({ data: msg }) => {
   if (msg.type === 'init') {
     port = msg.port;
     port.onmessage = ({ data }) => {
-      if (data.type === 'run')        runEpisode(data);
-      else if (data.type === 'sharedMaze') {
-        mazeShared = new Uint8Array(data.sab);
-        mazeCols   = data.cols;
-      }
+      if (data.type === 'run')             runEpisode(data);
+      else if (data.type === 'sharedMaze') { mazeShared = new Uint8Array(data.sab); mazeCols = data.cols; }
     };
   }
 };
 
-function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, display }) {
+async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, display, stepsPerFrame }) {
   if (config) Object.assign(CONFIG, config);
 
   // Reconstruct maze — from SAB (zero-copy) if available, else from cloned grid
@@ -63,6 +60,8 @@ function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, displ
   let catch1Frame = null, catch2Frame = null;
   let minDist = Infinity, prey1MinDist = Infinity, prey2MinDist = Infinity;
   let lastPost = 0;
+  let stepsSincePost = 0;
+  const throttled = display && stepsPerFrame > 0;
 
   while (frame < CONFIG.EPISODE_FRAMES) {
     frame++;
@@ -88,7 +87,16 @@ function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, displ
     }
     if (!prey1.alive && !prey2.alive) break;
 
-    if (display) {
+    if (throttled) {
+      // Slow mode: run stepsPerFrame steps, post a frame, then sleep 16 ms
+      if (++stepsSincePost >= stepsPerFrame) {
+        stepsSincePost = 0;
+        port.postMessage({ type: 'frame', idx, frame,
+          pred: snap(predator), prey: snap(prey1), prey2: snap(prey2) });
+        await new Promise(resolve => setTimeout(resolve, 16));
+      }
+    } else if (display) {
+      // Turbo: post at wall-clock ~60 fps, no sleep
       const now = Date.now();
       if (now - lastPost >= 16) {
         port.postMessage({ type: 'frame', idx, frame,
