@@ -27,7 +27,14 @@ const CONFIG = {
   ELITE_COUNT: 2,
 
   // Neural-network layer sizes
-  NN_LAYERS: [13, 20, 12, 2],
+  // inputs 0-12: 8 wall rays + opponent dx/dy/dist + own vx/vy
+  // input  13:   carryingWall (0 or 1)
+  // outputs 0-1: ax, ay   output 2: interact (tanh > 0.5 = pickup or place)
+  NN_LAYERS: [14, 20, 12, 3],
+
+  // Wall interaction
+  WALL_INTERACT_COOLDOWN: 20,   // sim-frames between pickups / placements
+  WALL_CARRY_SPEED: 0.65,       // max-speed multiplier while holding a wall
 
   // Canvas
   CANVAS_W: 360,

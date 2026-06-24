@@ -155,6 +155,8 @@ class Simulation {
       if (!str) return false;
       const data = JSON.parse(str);
       if (!data.predPop || data.predPop.length !== CONFIG.POP_SIZE) return false;
+      const expectedLen = this.predPop[0].getWeights().length;
+      if (data.predPop[0].length !== expectedLen) return false;  // architecture changed
       this.generation = data.generation || 0;
       this.history = data.history || [];
       data.predPop.forEach((w, i) => this.predPop[i].setWeights(w));

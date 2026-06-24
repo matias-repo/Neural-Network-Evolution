@@ -15,6 +15,10 @@ class Agent {
 
     // Sprite state
     this.facingLeft = false;
+
+    // Wall interaction
+    this.carryingWall   = false;
+    this._wallCooldown  = 0;
   }
 
   reset(x, y) {
@@ -24,6 +28,8 @@ class Agent {
     this.vy = 0;
     this.fitness = 0;
     this.rays = new Array(CONFIG.RAY_COUNT).fill(1);
+    this.carryingWall  = false;
+    this._wallCooldown = 0;
   }
 
   // ── Sensors → 13 inputs ──────────────────────────────────────────────────
@@ -54,6 +60,7 @@ class Agent {
     inputs.push(Math.min(1, dist * 4));
     inputs.push(this.vx / CONFIG.MAX_SPEED);
     inputs.push(this.vy / CONFIG.MAX_SPEED);
+    inputs.push(this.carryingWall ? 1 : 0);
 
     this.lastInputs = inputs;
     return inputs;
@@ -68,37 +75,44 @@ class Agent {
     this.vx = (this.vx + ax * CONFIG.ACCELERATION) * CONFIG.FRICTION;
     this.vy = (this.vy + ay * CONFIG.ACCELERATION) * CONFIG.FRICTION;
 
-    // Clamp to max speed
-    const spd = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-    if (spd > CONFIG.MAX_SPEED) {
-      this.vx = (this.vx / spd) * CONFIG.MAX_SPEED;
-      this.vy = (this.vy / spd) * CONFIG.MAX_SPEED;
+    // Clamp to max speed (reduced while carrying a wall)
+    const maxSpd = CONFIG.MAX_SPEED * (this.carryingWall ? CONFIG.WALL_CARRY_SPEED : 1);
+    const spd    = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+    if (spd > maxSpd) {
+      this.vx = (this.vx / spd) * maxSpd;
+      this.vy = (this.vy / spd) * maxSpd;
     }
 
     // Track facing direction for sprite flip
     if (Math.abs(this.vx) > 0.15) this.facingLeft = this.vx < 0;
 
-    // Axis-separated collision: try to push the wall before bouncing
-    const R  = CONFIG.AGENT_RADIUS;
-    const cs = maze.cellSize;
-
+    // Axis-separated collision resolution
+    const R = CONFIG.AGENT_RADIUS;
     this.x += this.vx;
-    if (maze.isBlocked(this.x, this.y, R)) {
-      const sx  = Math.sign(this.vx);
-      const col = Math.floor((this.x + sx * R) / cs);
-      const row = Math.floor(this.y / cs);
-      if (!maze.tryPushWall(col, row, col + sx, row) || maze.isBlocked(this.x, this.y, R)) {
-        this.x -= this.vx; this.vx *= -0.3;
-      }
-    }
-
+    if (maze.isBlocked(this.x, this.y, R)) { this.x -= this.vx; this.vx *= -0.3; }
     this.y += this.vy;
-    if (maze.isBlocked(this.x, this.y, R)) {
-      const sy  = Math.sign(this.vy);
-      const col = Math.floor(this.x / cs);
-      const row = Math.floor((this.y + sy * R) / cs);
-      if (!maze.tryPushWall(col, row, col, row + sy) || maze.isBlocked(this.x, this.y, R)) {
-        this.y -= this.vy; this.vy *= -0.3;
+    if (maze.isBlocked(this.x, this.y, R)) { this.y -= this.vy; this.vy *= -0.3; }
+
+    // Wall interaction (output index 2)
+    if (this._wallCooldown > 0) {
+      this._wallCooldown--;
+    } else if ((this.lastOutputs[2] || 0) > 0.5) {
+      const spd   = this.speed;
+      const angle = spd > 0.3 ? Math.atan2(this.vy, this.vx) : (this.facingLeft ? Math.PI : 0);
+      const { col, row } = maze.getCellAt(
+        this.x + Math.cos(angle) * maze.cellSize,
+        this.y + Math.sin(angle) * maze.cellSize
+      );
+      if (!this.carryingWall) {
+        if (maze.tryPickupWall(col, row)) {
+          this.carryingWall  = true;
+          this._wallCooldown = CONFIG.WALL_INTERACT_COOLDOWN;
+        }
+      } else {
+        if (maze.tryPlaceWall(col, row)) {
+          this.carryingWall  = false;
+          this._wallCooldown = CONFIG.WALL_INTERACT_COOLDOWN;
+        }
       }
     }
   }

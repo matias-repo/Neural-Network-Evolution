@@ -82,13 +82,19 @@ class Maze {
     return { x: cs * 2 + cs / 2, y: cs * 2 + cs / 2 };
   }
 
-  // Attempt to slide the wall at (col,row) one step to (toCol,toRow).
-  // Returns true if the move happened, false if blocked or not a wall.
-  tryPushWall(col, row, toCol, toRow) {
-    if (!this.grid[row]?.[col]) return false;
-    if (this.isWall(toCol, toRow)) return false;
-    this.setCell(col, row, 0);       // setCell already guards the border
-    this.setCell(toCol, toRow, 1);
+  // Pick up a non-border wall cell. Returns true on success.
+  tryPickupWall(col, row) {
+    if (row <= 0 || row >= this.rows - 1 || col <= 0 || col >= this.cols - 1) return false;
+    if (!this.grid[row][col]) return false;
+    this.grid[row][col] = 0;
+    return true;
+  }
+
+  // Place a wall on an empty non-border cell. Returns true on success.
+  tryPlaceWall(col, row) {
+    if (row <= 0 || row >= this.rows - 1 || col <= 0 || col >= this.cols - 1) return false;
+    if (this.grid[row][col]) return false;
+    this.grid[row][col] = 1;
     return true;
   }
 

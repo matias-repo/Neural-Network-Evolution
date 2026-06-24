@@ -166,6 +166,19 @@ class Renderer {
 
     // Character sprite
     drawSprite(this.ctx, frame, pal, cx, cy, scale, flip);
+
+    // Carried-wall indicator: small brick floating above the head
+    if (agent.carryingWall) {
+      const spriteH = scale * 10;
+      const bw = scale * 4, bh = scale * 3;
+      const bx = cx - Math.floor(bw / 2);
+      const by = cy - Math.floor(spriteH / 2) - bh - scale;
+      this.ctx.fillStyle = '#1a2460';
+      this.ctx.fillRect(bx, by, bw, bh);
+      this.ctx.fillStyle = '#3050a8';
+      this.ctx.fillRect(bx, by, bw, 1);
+      this.ctx.fillRect(bx, by, 1, bh);
+    }
   }
 
   // ── Fitness chart ─────────────────────────────────────────────────────────
