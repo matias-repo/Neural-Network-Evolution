@@ -33,15 +33,20 @@ function init() {
     const w = new Worker('js/episode-worker.js');
     // Forward episode results/frames to the coordinator, tagging with workerIdx
     w.onmessage = ({ data }) => coordinator.postMessage({ ...data, workerIdx: i });
+    w.onerror   = (e) => console.error(`[epWorker ${i}] error:`, e.message, e);
     return w;
   });
 
   let lastState = null;
 
+  coordinator.onerror = (e) => console.error('[coordinator] error:', e.message, e);
+
   coordinator.onmessage = ({ data }) => {
     if (data.type === 'dispatch') {
       // Route a 'run' command from the coordinator to the right episode worker
-      epWorkers[data.workerIdx].postMessage(data.run);
+      const w = epWorkers[data.workerIdx];
+      if (!w) { console.error('[main] dispatch to unknown workerIdx', data.workerIdx); return; }
+      w.postMessage(data.run);
       return;
     }
     if (data.type === 'frame') {

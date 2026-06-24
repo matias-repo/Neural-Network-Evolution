@@ -39,6 +39,7 @@ let displayEp   = 0;           // episode index worker-0 is currently rendering
 let mazeSave    = null;         // baseline grid (2-D number array) sent to every episode
 let mazeDirty   = false;
 let cfgOverride = null;         // layout config forwarded to episode workers
+let lastSaveMs  = 0;            // timestamp of last save; throttles saves to ≤1 per 5 s
 
 // ── Control ───────────────────────────────────────────────────────────────
 let paused      = true;
@@ -50,6 +51,10 @@ let lastFlushMs = 0;
 // Main-thread message handler
 // ═══════════════════════════════════════════════════════════════════════════
 self.onmessage = ({ data: msg }) => {
+  try { _handleMessage(msg); } catch (err) { console.error('[coordinator] onmessage error:', err); }
+};
+
+function _handleMessage(msg) {
   switch (msg.type) {
 
     // Control messages from the main thread
@@ -92,7 +97,7 @@ self.onmessage = ({ data: msg }) => {
       _onEpisodeMsg(msg.workerIdx, msg);
       break;
   }
-};
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Episode-worker message handler (routed via main thread)
@@ -216,7 +221,7 @@ function _reset() {
   episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
   displayEp = 0;
   lastSnap  = null;
-  _postSave(null);
+  _postSave(null, true);
   if (!paused && initialized) _dispatchIdle();
 }
 
@@ -295,7 +300,14 @@ function _evolve() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Flush / render loop
 // ═══════════════════════════════════════════════════════════════════════════
-function _postSave(data) {
+function _postSave(data, force = false) {
+  const now = Date.now();
+  // Throttle saves: JSON.stringify of the full state is expensive.  Running it
+  // every generation at 10+ gens/sec blocks the main thread long enough to
+  // back up the dispatch queue and stall the simulation.  Null saves (reset)
+  // are always sent immediately.
+  if (data !== null && !force && now - lastSaveMs < 5000) return;
+  lastSaveMs = now;
   self.postMessage({ type: 'save', simState: data });
 }
 
