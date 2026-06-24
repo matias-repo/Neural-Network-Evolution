@@ -1,50 +1,53 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:           #0d0d1a;
-  --panel:        #10102a;
-  --border:       #1e2a5e;
-  --text:         #b0b4d8;
-  --text-dim:     #444870;
-  --btn-bg:       #161830;
-  --btn-hover:    #1e2248;
-  --btn-active:   #263090;
-  --accent:       #4466ee;
+  --bg:        #0d0d1a;
+  --panel:     #10102a;
+  --border:    #1e2a5e;
+  --text:      #b0b4d8;
+  --text-dim:  #444870;
+  --btn-bg:    #161830;
+  --btn-hover: #1e2248;
+  --btn-act:   #263090;
+  --accent:    #4466ee;
+  --w:         360px;   /* canonical app width */
 }
 
-html, body {
+html {
   height: 100%;
+  background: var(--bg);
 }
 
 body {
+  min-height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: 'Courier New', Courier, monospace;
   font-size: 12px;
+  /* centre the app column on desktop; fills on mobile */
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-bottom: 24px;
 }
 
-/* ── Top bar ──────────────────────────────────────────────────────────────── */
+/* ── Top bar ───────────────────────────────────────────────────────────────── */
 
 .top-bar {
-  width: 800px;
+  width: var(--w);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 4px;
+  gap: 6px;
+  padding: 8px 6px 6px;
 }
 
 .logo {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 3px;
-  color: #505880;
+  color: #404870;
   text-transform: uppercase;
-  margin-right: 4px;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .top-controls {
@@ -54,46 +57,41 @@ body {
   flex: 1;
 }
 
-/* ── Buttons ──────────────────────────────────────────────────────────────── */
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
 
 button {
   background: var(--btn-bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 3px;
-  padding: 4px 10px;
+  padding: 6px 10px;
   font-family: inherit;
   font-size: 11px;
   cursor: pointer;
   transition: background 0.12s;
   white-space: nowrap;
-  line-height: 1.4;
+  /* touch-friendly minimum hit area */
+  min-height: 34px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:hover  { background: var(--btn-hover); border-color: #3050a0; }
-button.active { background: var(--btn-active); border-color: var(--accent); color: #fff; }
+button.active { background: var(--btn-act); border-color: var(--accent); color: #fff; }
 button.dim-btn { color: var(--text-dim); }
 button.dim-btn:hover { color: var(--text); }
 
-.ctrl-btn {
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-.speed-btn {
-  min-width: 36px;
-  text-align: center;
-  font-weight: 700;
-  color: #8898ee;
-}
+.ctrl-btn  { padding: 6px 8px; }
+.speed-btn { min-width: 38px; text-align: center; font-weight: 700; color: #8898ee; }
 
 .divider {
   width: 1px;
-  height: 16px;
+  height: 18px;
   background: var(--border);
-  margin: 0 3px;
+  margin: 0 2px;
   flex-shrink: 0;
 }
+
+.spacer { flex: 1; }
 
 .chk-label {
   display: flex;
@@ -102,12 +100,12 @@ button.dim-btn:hover { color: var(--text); }
   font-size: 11px;
   color: var(--text-dim);
   cursor: pointer;
-  margin-left: 4px;
+  padding: 4px 2px;
+  -webkit-tap-highlight-color: transparent;
 }
-
 .chk-label input { accent-color: var(--accent); }
 
-/* ── Stage (canvas + edit bar) ────────────────────────────────────────────── */
+/* ── Stage ─────────────────────────────────────────────────────────────────── */
 
 .stage {
   display: flex;
@@ -117,39 +115,49 @@ button.dim-btn:hover { color: var(--text); }
 
 .canvas-wrap {
   position: relative;
-  border: 1px solid var(--border);
+  width: var(--w);
   line-height: 0;
-  box-shadow: 0 0 60px rgba(30, 42, 94, 0.6);
+  border: 1px solid var(--border);
+  box-shadow: 0 0 40px rgba(20, 30, 80, 0.8);
 }
 
 #gameCanvas {
   display: block;
+  width: 100%;
+  height: auto;
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;   /* prevent browser scroll during canvas drag */
 }
 
 #editOverlay {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   display: none;
 }
 
-/* ── Edit bar ─────────────────────────────────────────────────────────────── */
+/* ── Edit bar (portrait 2-row strip) ───────────────────────────────────────── */
 
 .edit-bar {
-  display: none;            /* shown via JS when in edit mode */
-  align-items: center;
+  display: none;
+  flex-direction: column;
   gap: 4px;
-  flex-wrap: nowrap;
-  width: 800px;
-  padding: 5px 6px;
+  width: var(--w);
+  padding: 6px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-top: none;
 }
 
-.edit-bar.visible {
+.edit-bar.visible { display: flex; }
+
+.edit-row {
   display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .bar-label {

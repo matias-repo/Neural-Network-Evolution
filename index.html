@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Neural Network Evolution – Predator vs Prey</title>
+  <!-- Mobile web-app config -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d0d1a" />
+  <title>NNEvo</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -30,22 +35,25 @@
     <canvas id="editOverlay"></canvas>
   </div>
 
-  <!-- Edit toolbar – shown only in edit mode -->
+  <!-- Edit toolbar – 2-row strip, shown only in edit mode -->
   <div class="edit-bar" id="edit-bar">
-    <button id="tool-draw"  class="active">● Draw</button>
-    <button id="tool-erase">○ Erase</button>
-    <div class="divider"></div>
-    <button id="btn-clear" class="dim-btn">Clear</button>
-    <div class="divider"></div>
-    <span class="bar-label">Preset</span>
-    <button data-preset="empty">Empty</button>
-    <button data-preset="cross">Cross</button>
-    <button data-preset="rooms">Rooms</button>
-    <button data-preset="spiral">Spiral</button>
-    <button data-preset="zigzag">Zigzag</button>
-    <div class="divider"></div>
-    <button id="btn-save-maze" title="Save to browser">💾</button>
-    <button id="btn-load-maze" title="Load from browser">📂</button>
+    <div class="edit-row">
+      <button id="tool-draw"  class="active">● Draw</button>
+      <button id="tool-erase">○ Erase</button>
+      <div class="divider"></div>
+      <button id="btn-clear" class="dim-btn">Clear</button>
+      <div class="spacer"></div>
+      <button id="btn-save-maze" title="Save to browser">💾</button>
+      <button id="btn-load-maze" title="Load from browser">📂</button>
+    </div>
+    <div class="edit-row">
+      <span class="bar-label">Preset</span>
+      <button data-preset="empty">Empty</button>
+      <button data-preset="cross">Cross</button>
+      <button data-preset="rooms">Rooms</button>
+      <button data-preset="spiral">Spiral</button>
+      <button data-preset="zigzag">Zigzag</button>
+    </div>
   </div>
 </main>
 

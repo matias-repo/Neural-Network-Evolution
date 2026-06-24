@@ -57,6 +57,7 @@ class UI {
   _bindCanvasEvents() {
     const canvas = document.getElementById('gameCanvas');
 
+    // ── Mouse ──────────────────────────────────────────────────────────────
     canvas.addEventListener('mousedown', e => {
       if (this.mode !== 'edit') return;
       this._mouseDown = true;
@@ -64,29 +65,70 @@ class UI {
     });
 
     canvas.addEventListener('mousemove', e => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const { col, row } = this.maze.getCellAt(mx, my);
-      this._hoverCell = { col, row };
-
-      if (this._mouseDown && this.mode === 'edit') this._applyTool(e);
-      this._drawHoverHighlight(mx, my);
+      this._handleMove(e, canvas);
     });
 
-    canvas.addEventListener('mouseup', () => { this._mouseDown = false; this._lastCell = null; });
+    canvas.addEventListener('mouseup',    () => { this._mouseDown = false; this._lastCell = null; });
     canvas.addEventListener('mouseleave', () => { this._mouseDown = false; this._hoverCell = null; this._lastCell = null; });
 
     canvas.addEventListener('contextmenu', e => {
       if (this.mode === 'edit') { e.preventDefault(); this._setTool(this.editTool === 'draw' ? 'erase' : 'draw'); }
     });
+
+    // ── Touch ──────────────────────────────────────────────────────────────
+    canvas.addEventListener('touchstart', e => {
+      if (this.mode !== 'edit') return;
+      e.preventDefault();
+      this._mouseDown = true;
+      this._applyTool(this._touchEvt(e, canvas));
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+      if (this.mode !== 'edit') return;
+      e.preventDefault();
+      this._handleMove(this._touchEvt(e, canvas), canvas);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', e => {
+      e.preventDefault();
+      this._mouseDown = false;
+      this._lastCell = null;
+    }, { passive: false });
+  }
+
+  // Convert a TouchEvent's first touch into a mouse-like {clientX, clientY} object.
+  // Accounts for canvas CSS scaling (canvas pixel coords ≠ CSS pixel coords on mobile).
+  _touchEvt(e, canvas) {
+    const t = e.touches[0] || e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CONFIG.CANVAS_W / rect.width;
+    const scaleY = CONFIG.CANVAS_H / rect.height;
+    return {
+      clientX: rect.left + (t.clientX - rect.left) / scaleX * scaleX,
+      clientY: rect.top  + (t.clientY - rect.top)  / scaleY * scaleY,
+    };
+  }
+
+  _handleMove(e, canvas) {
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = CONFIG.CANVAS_W / rect.width;
+    const scaleY = CONFIG.CANVAS_H / rect.height;
+    // Map CSS pixel position to canvas pixel position
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top)  * scaleY;
+    const { col, row } = this.maze.getCellAt(mx, my);
+    this._hoverCell = { col, row };
+    if (this._mouseDown && this.mode === 'edit') this._applyTool(e);
+    this._drawHoverHighlight(mx, my);
   }
 
   _applyTool(e) {
     const canvas = document.getElementById('gameCanvas');
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = CONFIG.CANVAS_W / rect.width;
+    const scaleY = CONFIG.CANVAS_H / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top)  * scaleY;
     const { col, row } = this.maze.getCellAt(mx, my);
 
     const key = `${col},${row}`;
