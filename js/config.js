@@ -35,7 +35,7 @@ const CONFIG = {
   // Wall interaction
   WALL_INTERACT_COOLDOWN: 20,   // sim-frames between pickups / placements
   WALL_CARRY_SPEED: 0.65,       // max-speed multiplier while holding a wall
-  WALL_PICKUP_BONUS: 10,        // fitness bonus per successful pickup or placement
+  WALL_PICKUP_BONUS: 0,         // direct bonus removed — strategic use earns fitness through primary objectives
 
   // Canvas
   CANVAS_W: 360,
