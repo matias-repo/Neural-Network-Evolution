@@ -3,6 +3,9 @@ class NeuralNetwork {
     this.layerSizes = layerSizes;
     this.weights = [];
     this.biases = [];
+    // Pre-allocated activation buffers — one per layer, reused every forward pass.
+    // Eliminates ~3 heap allocations per call (previously `const next = []` per layer).
+    this._bufs = layerSizes.map(n => new Float32Array(n));
     this._initRandom();
   }
 
@@ -22,19 +25,25 @@ class NeuralNetwork {
   }
 
   forward(inputs) {
-    let a = inputs.slice();
-    for (let i = 0; i < this.weights.length; i++) {
-      const W = this.weights[i];
-      const b = this.biases[i];
-      const next = [];
+    const bufs = this._bufs;
+    // Write inputs into the first buffer (no heap allocation)
+    const inp = bufs[0];
+    for (let i = 0; i < inp.length; i++) inp[i] = inputs[i];
+    // Propagate through layers, writing each result into the next pre-allocated buffer
+    for (let L = 0; L < this.weights.length; L++) {
+      const W   = this.weights[L];
+      const b   = this.biases[L];
+      const src = bufs[L];
+      const dst = bufs[L + 1];
       for (let j = 0; j < W.length; j++) {
         let sum = b[j];
-        for (let k = 0; k < a.length; k++) sum += W[j][k] * a[k];
-        next.push(Math.tanh(sum));
+        const row = W[j];
+        for (let k = 0; k < row.length; k++) sum += row[k] * src[k];
+        dst[j] = Math.tanh(sum);
       }
-      a = next;
     }
-    return a;
+    // Return reference to last buffer — caller must read values before the next forward() call
+    return bufs[bufs.length - 1];
   }
 
   // Flatten all parameters into a single array

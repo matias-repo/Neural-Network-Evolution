@@ -9,8 +9,10 @@ class Agent {
     this.fitness = 0;
     this.alive = true;
 
-    this.rays = new Array(CONFIG.RAY_COUNT).fill(1);
-    this.lastInputs = [];
+    // Pre-allocated buffers — reused every frame to avoid per-call heap allocations.
+    this.rays       = new Float32Array(CONFIG.RAY_COUNT).fill(1);
+    this._inputs    = new Float32Array(type === 'predator' ? CONFIG.PRED_NN_LAYERS[0] : CONFIG.PREY_NN_LAYERS[0]);
+    this.lastInputs = this._inputs;
     this.lastOutputs = [0, 0, 0];
 
     this.facingLeft = false;
@@ -27,7 +29,7 @@ class Agent {
     this.vy = 0;
     this.fitness = 0;
     this.alive = true;
-    this.rays = new Array(CONFIG.RAY_COUNT).fill(1);
+    this.rays.fill(1);
     this.carryingWall    = false;
     this._wallCooldown   = 0;
     this.wallInteractions = 0;
@@ -49,53 +51,51 @@ class Agent {
   //   [14-15] own vx/vy        [16-17] agent1 vx/vy [18-19] agent2 vx/vy
   //   [20]    agent2 alive      [21]    carryingWall
   sense(maze, agent1, agent2) {
-    const rc = CONFIG.RAY_COUNT;
-    const inputs = [];
+    const rc  = CONFIG.RAY_COUNT;
+    const inp = this._inputs;
+    let   n   = 0;
 
     for (let i = 0; i < rc; i++) {
       const angle = (i / rc) * Math.PI * 2;
       const d = maze.castRay(this.x, this.y, angle, CONFIG.RAY_MAX_DIST, CONFIG.RAY_STEP);
       this.rays[i] = d;
-      inputs.push(d);
+      inp[n++] = d;
     }
 
     // Own position
-    inputs.push(this.x / CONFIG.CANVAS_W);
-    inputs.push(this.y / CONFIG.CANVAS_H);
+    inp[n++] = this.x / CONFIG.CANVAS_W;
+    inp[n++] = this.y / CONFIG.CANVAS_H;
 
     // Agent1 position
-    inputs.push(agent1.x / CONFIG.CANVAS_W);
-    inputs.push(agent1.y / CONFIG.CANVAS_H);
+    inp[n++] = agent1.x / CONFIG.CANVAS_W;
+    inp[n++] = agent1.y / CONFIG.CANVAS_H;
 
     // Agent2 position
-    inputs.push(agent2.x / CONFIG.CANVAS_W);
-    inputs.push(agent2.y / CONFIG.CANVAS_H);
+    inp[n++] = agent2.x / CONFIG.CANVAS_W;
+    inp[n++] = agent2.y / CONFIG.CANVAS_H;
 
     // Own velocity
-    inputs.push(this.vx / CONFIG.MAX_SPEED);
-    inputs.push(this.vy / CONFIG.MAX_SPEED);
+    inp[n++] = this.vx / CONFIG.MAX_SPEED;
+    inp[n++] = this.vy / CONFIG.MAX_SPEED;
 
     // Agent1 velocity
-    inputs.push(agent1.vx / CONFIG.MAX_SPEED);
-    inputs.push(agent1.vy / CONFIG.MAX_SPEED);
+    inp[n++] = agent1.vx / CONFIG.MAX_SPEED;
+    inp[n++] = agent1.vy / CONFIG.MAX_SPEED;
 
     // Agent2 velocity
-    inputs.push(agent2.vx / CONFIG.MAX_SPEED);
-    inputs.push(agent2.vy / CONFIG.MAX_SPEED);
+    inp[n++] = agent2.vx / CONFIG.MAX_SPEED;
+    inp[n++] = agent2.vy / CONFIG.MAX_SPEED;
 
     if (this.type === 'predator') {
-      // Predator needs to know which prey are still alive to pick a target
-      inputs.push(agent1.alive ? 1 : 0);
-      inputs.push(agent2.alive ? 1 : 0);
+      inp[n++] = agent1.alive ? 1 : 0;
+      inp[n++] = agent2.alive ? 1 : 0;
     } else {
-      // Prey needs to know if its ally is still alive (alone = flee harder)
-      inputs.push(agent2.alive ? 1 : 0);
+      inp[n++] = agent2.alive ? 1 : 0;
     }
 
-    inputs.push(this.carryingWall ? 1 : 0);
+    inp[n++] = this.carryingWall ? 1 : 0;
 
-    this.lastInputs = inputs;
-    return inputs;
+    return inp;
   }
 
   // ── Physics update ────────────────────────────────────────────────────────
