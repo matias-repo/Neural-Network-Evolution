@@ -7,7 +7,7 @@ class UI {
     this.mode = 'play';       // 'play' | 'edit' | 'pause'
     this.editTool = 'draw';   // 'draw' | 'erase'
     this.speedIndex = 0;      // index into SPEEDS
-    this.SPEEDS = [1, 5, 20, 100];
+    this.SPEEDS = [1, 5, 20, 100, 500, 2000];
 
     this._mouseDown = false;
     this._lastCell = null;

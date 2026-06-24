@@ -120,6 +120,7 @@ class Simulation {
     this.preyFitness = new Array(CONFIG.POP_SIZE).fill(0);
 
     this.generation++;
+    this.save();
     this._startEpisode(0);
   }
 
@@ -131,8 +132,40 @@ class Simulation {
     this.frame = 0;
     this.totalFrames = 0;
     this.history = [];
+    localStorage.removeItem('nn-evo-state');
     this._initPopulations();
     this._startEpisode(0);
+  }
+
+  save() {
+    try {
+      const data = {
+        generation: this.generation,
+        predPop: this.predPop.map(nn => nn.getWeights()),
+        preyPop: this.preyPop.map(nn => nn.getWeights()),
+        history: this.history,
+      };
+      localStorage.setItem('nn-evo-state', JSON.stringify(data));
+    } catch (_) {}
+  }
+
+  tryRestore() {
+    try {
+      const str = localStorage.getItem('nn-evo-state');
+      if (!str) return false;
+      const data = JSON.parse(str);
+      if (!data.predPop || data.predPop.length !== CONFIG.POP_SIZE) return false;
+      this.generation = data.generation || 0;
+      this.history = data.history || [];
+      data.predPop.forEach((w, i) => this.predPop[i].setWeights(w));
+      data.preyPop.forEach((w, i) => this.preyPop[i].setWeights(w));
+      this.predFitness = new Array(CONFIG.POP_SIZE).fill(0);
+      this.preyFitness = new Array(CONFIG.POP_SIZE).fill(0);
+      this._startEpisode(0);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // Call when the maze changes so start positions are refreshed

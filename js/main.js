@@ -15,7 +15,10 @@ function init() {
 
   // Restore saved maze if any
   const saved = localStorage.getItem('nn-evo-maze');
-  if (saved) { try { maze.deserialize(saved); sim.onMazeChanged(); } catch (_) {} }
+  if (saved) { try { maze.deserialize(saved); } catch (_) {} }
+
+  // Restore saved AI populations and generation
+  sim.tryRestore();
 
   requestAnimationFrame(loop);
 }
