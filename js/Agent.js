@@ -7,16 +7,14 @@ class Agent {
     this.vx = 0;
     this.vy = 0;
     this.fitness = 0;
+    this.alive = true;
 
-    // Cached sensor data (rays still used for NN inputs, not rendered)
     this.rays = new Array(CONFIG.RAY_COUNT).fill(1);
     this.lastInputs = [];
-    this.lastOutputs = [0, 0];
+    this.lastOutputs = [0, 0, 0];
 
-    // Sprite state
     this.facingLeft = false;
 
-    // Wall interaction
     this.carryingWall    = false;
     this._wallCooldown   = 0;
     this.wallInteractions = 0;
@@ -28,24 +26,29 @@ class Agent {
     this.vx = 0;
     this.vy = 0;
     this.fitness = 0;
+    this.alive = true;
     this.rays = new Array(CONFIG.RAY_COUNT).fill(1);
     this.carryingWall    = false;
     this._wallCooldown   = 0;
     this.wallInteractions = 0;
   }
 
-  // ── Sensors → 17 inputs ──────────────────────────────────────────────────
-  //  [0..7]  wall ray distances (1 = clear, 0 = wall right here)
-  //  [8]     own x / CANVAS_W
-  //  [9]     own y / CANVAS_H
-  //  [10]    opponent x / CANVAS_W
-  //  [11]    opponent y / CANVAS_H
-  //  [12]    own vx / MAX_SPEED
-  //  [13]    own vy / MAX_SPEED
-  //  [14]    opponent vx / MAX_SPEED  (lets agents predict movement)
-  //  [15]    opponent vy / MAX_SPEED
-  //  [16]    carryingWall (0 or 1)
-  sense(maze, opponent) {
+  // ── Sensors ───────────────────────────────────────────────────────────────
+  // agent1: primary target  (predator → prey1,    prey → predator)
+  // agent2: secondary agent (predator → prey2,    prey → ally prey)
+  //
+  // Predator inputs [23]:
+  //   [0-7]   wall rays
+  //   [8-9]   own x/y          [10-11] agent1 x/y   [12-13] agent2 x/y
+  //   [14-15] own vx/vy        [16-17] agent1 vx/vy [18-19] agent2 vx/vy
+  //   [20]    agent1 alive      [21]    agent2 alive  [22]    carryingWall
+  //
+  // Prey inputs [22]:
+  //   [0-7]   wall rays
+  //   [8-9]   own x/y          [10-11] agent1 x/y   [12-13] agent2 x/y
+  //   [14-15] own vx/vy        [16-17] agent1 vx/vy [18-19] agent2 vx/vy
+  //   [20]    agent2 alive      [21]    carryingWall
+  sense(maze, agent1, agent2) {
     const rc = CONFIG.RAY_COUNT;
     const inputs = [];
 
@@ -56,14 +59,39 @@ class Agent {
       inputs.push(d);
     }
 
+    // Own position
     inputs.push(this.x / CONFIG.CANVAS_W);
     inputs.push(this.y / CONFIG.CANVAS_H);
-    inputs.push(opponent.x / CONFIG.CANVAS_W);
-    inputs.push(opponent.y / CONFIG.CANVAS_H);
+
+    // Agent1 position
+    inputs.push(agent1.x / CONFIG.CANVAS_W);
+    inputs.push(agent1.y / CONFIG.CANVAS_H);
+
+    // Agent2 position
+    inputs.push(agent2.x / CONFIG.CANVAS_W);
+    inputs.push(agent2.y / CONFIG.CANVAS_H);
+
+    // Own velocity
     inputs.push(this.vx / CONFIG.MAX_SPEED);
     inputs.push(this.vy / CONFIG.MAX_SPEED);
-    inputs.push(opponent.vx / CONFIG.MAX_SPEED);
-    inputs.push(opponent.vy / CONFIG.MAX_SPEED);
+
+    // Agent1 velocity
+    inputs.push(agent1.vx / CONFIG.MAX_SPEED);
+    inputs.push(agent1.vy / CONFIG.MAX_SPEED);
+
+    // Agent2 velocity
+    inputs.push(agent2.vx / CONFIG.MAX_SPEED);
+    inputs.push(agent2.vy / CONFIG.MAX_SPEED);
+
+    if (this.type === 'predator') {
+      // Predator needs to know which prey are still alive to pick a target
+      inputs.push(agent1.alive ? 1 : 0);
+      inputs.push(agent2.alive ? 1 : 0);
+    } else {
+      // Prey needs to know if its ally is still alive (alone = flee harder)
+      inputs.push(agent2.alive ? 1 : 0);
+    }
+
     inputs.push(this.carryingWall ? 1 : 0);
 
     this.lastInputs = inputs;
@@ -71,15 +99,17 @@ class Agent {
   }
 
   // ── Physics update ────────────────────────────────────────────────────────
-  update(maze, opponent) {
-    const inputs = this.sense(maze, opponent);
+  // agent1/agent2 same convention as sense()
+  update(maze, agent1, agent2) {
+    if (!this.alive) return;
+
+    const inputs = this.sense(maze, agent1, agent2);
     const [ax, ay, interact] = this.nn.forward(inputs);
     this.lastOutputs = [ax, ay, interact];
 
     this.vx = (this.vx + ax * CONFIG.ACCELERATION) * CONFIG.FRICTION;
     this.vy = (this.vy + ay * CONFIG.ACCELERATION) * CONFIG.FRICTION;
 
-    // Clamp to max speed (reduced while carrying a wall)
     const maxSpd = CONFIG.MAX_SPEED * (this.carryingWall ? CONFIG.WALL_CARRY_SPEED : 1);
     const spd    = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (spd > maxSpd) {
@@ -87,17 +117,14 @@ class Agent {
       this.vy = (this.vy / spd) * maxSpd;
     }
 
-    // Track facing direction for sprite flip
     if (Math.abs(this.vx) > 0.15) this.facingLeft = this.vx < 0;
 
-    // Axis-separated collision resolution
     const R = CONFIG.AGENT_RADIUS;
     this.x += this.vx;
     if (maze.isBlocked(this.x, this.y, R)) { this.x -= this.vx; this.vx *= -0.3; }
     this.y += this.vy;
     if (maze.isBlocked(this.x, this.y, R)) { this.y -= this.vy; this.vy *= -0.3; }
 
-    // Wall interaction (output index 2)
     if (this._wallCooldown > 0) {
       this._wallCooldown--;
     } else if (interact > 0.5) {

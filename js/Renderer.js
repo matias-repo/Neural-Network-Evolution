@@ -24,13 +24,18 @@ class Renderer {
     this._drawMaze(maze, mode);
 
     if (mode !== 'edit') {
-      const dist = sim.predator && sim.prey
-        ? Math.hypot(sim.predator.x - sim.prey.x, sim.predator.y - sim.prey.y)
+      const dist1 = sim.predator && sim.prey
+        ? Math.hypot(sim.predator.x - sim.prey.x,  sim.predator.y - sim.prey.y)
         : Infinity;
+      const dist2 = sim.predator && sim.prey2
+        ? Math.hypot(sim.predator.x - sim.prey2.x, sim.predator.y - sim.prey2.y)
+        : Infinity;
+      const nearestDist = Math.min(dist1, dist2);
 
       // Prey drawn first so predator appears on top
-      this._drawCharacter(sim.prey,     dist, sim.totalFrames);
-      this._drawCharacter(sim.predator, dist, sim.totalFrames);
+      this._drawCharacter(sim.prey,     dist1,       sim.totalFrames);
+      this._drawCharacter(sim.prey2,    dist2,       sim.totalFrames);
+      this._drawCharacter(sim.predator, nearestDist, sim.totalFrames);
     }
 
     this._drawHUD(sim);
@@ -100,6 +105,21 @@ class Renderer {
 
   _drawCharacter(agent, distToOpponent, totalFrames) {
     if (!agent) return;
+
+    // Caught prey: draw a tiny faint marker at their last position and stop
+    if (agent.alive === false) {
+      const ctx = this.ctx;
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = '#60a070';
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(agent.x - 4, agent.y - 4); ctx.lineTo(agent.x + 4, agent.y + 4);
+      ctx.moveTo(agent.x + 4, agent.y - 4); ctx.lineTo(agent.x - 4, agent.y + 4);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
     const isPrey = agent.type === 'prey';
 
     // Pick animation set and timing

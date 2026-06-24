@@ -50,11 +50,13 @@ function init() {
         type: s.type, x: s.x, y: s.y,
         vx: s.vx, vy: s.vy, speed: s.speed,
         facingLeft: s.facingLeft, carryingWall: s.carryingWall,
+        alive: s.alive !== false,
       } : null;
 
       const simProxy = {
         predator:        makeAgent(lastState.pred),
         prey:            makeAgent(lastState.prey),
+        prey2:           makeAgent(lastState.prey2),
         generation:      lastState.generation,
         episode:         lastState.episode,
         episodeProgress: lastState.episodeProgress,

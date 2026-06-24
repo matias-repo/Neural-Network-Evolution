@@ -68,6 +68,7 @@ function agentSnap(agent) {
     speed:        agent.speed,
     facingLeft:   agent.facingLeft,
     carryingWall: agent.carryingWall,
+    alive:        agent.alive,
   };
 }
 
@@ -76,6 +77,7 @@ function flush(includeMaze) {
     type:            'frame',
     pred:            agentSnap(sim.predator),
     prey:            agentSnap(sim.prey),
+    prey2:           agentSnap(sim.prey2),
     generation:      sim.generation,
     episode:         sim.episode,
     episodeProgress: sim.episodeProgress,
