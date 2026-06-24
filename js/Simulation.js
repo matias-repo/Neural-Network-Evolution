@@ -32,6 +32,7 @@ class Simulation {
     this.paused = false;
     this.caught = false;    // whether prey was caught this episode
 
+    this.onSave = null;
     this._initPopulations();
     this._startEpisode(0);
   }
@@ -136,31 +137,27 @@ class Simulation {
     this.frame = 0;
     this.totalFrames = 0;
     this.history = [];
-    localStorage.removeItem('nn-evo-state');
+    if (this.onSave) this.onSave(null);
     this._initPopulations();
     this._startEpisode(0);
   }
 
   save() {
-    try {
-      const data = {
-        generation: this.generation,
-        predPop: this.predPop.map(nn => nn.getWeights()),
-        preyPop: this.preyPop.map(nn => nn.getWeights()),
-        history: this.history,
-      };
-      localStorage.setItem('nn-evo-state', JSON.stringify(data));
-    } catch (_) {}
+    if (!this.onSave) return;
+    this.onSave({
+      generation: this.generation,
+      predPop: this.predPop.map(nn => nn.getWeights()),
+      preyPop: this.preyPop.map(nn => nn.getWeights()),
+      history: this.history,
+    });
   }
 
-  tryRestore() {
+  tryRestore(data) {
     try {
-      const str = localStorage.getItem('nn-evo-state');
-      if (!str) return false;
-      const data = JSON.parse(str);
+      if (!data) return false;
       if (!data.predPop || data.predPop.length !== CONFIG.POP_SIZE) return false;
       const expectedLen = this.predPop[0].getWeights().length;
-      if (data.predPop[0].length !== expectedLen) return false;  // architecture changed
+      if (data.predPop[0].length !== expectedLen) return false;
       this.generation = data.generation || 0;
       this.history = data.history || [];
       data.predPop.forEach((w, i) => this.predPop[i].setWeights(w));

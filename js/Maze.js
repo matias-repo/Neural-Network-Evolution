@@ -4,6 +4,7 @@ class Maze {
     this.rows = rows;
     this.cellSize = cellSize;
     this.grid = Array.from({ length: rows }, () => new Array(cols).fill(0));
+    this.dirty = false;
     this.addBorderWalls();
   }
 
@@ -87,6 +88,7 @@ class Maze {
     if (row <= 0 || row >= this.rows - 1 || col <= 0 || col >= this.cols - 1) return false;
     if (!this.grid[row][col]) return false;
     this.grid[row][col] = 0;
+    this.dirty = true;
     return true;
   }
 
@@ -95,6 +97,7 @@ class Maze {
     if (row <= 0 || row >= this.rows - 1 || col <= 0 || col >= this.cols - 1) return false;
     if (this.grid[row][col]) return false;
     this.grid[row][col] = 1;
+    this.dirty = true;
     return true;
   }
 

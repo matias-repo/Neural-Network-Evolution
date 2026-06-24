@@ -1,7 +1,7 @@
 class UI {
-  constructor(maze, sim, renderer) {
+  constructor(maze, worker, renderer) {
     this.maze = maze;
-    this.sim = sim;
+    this.worker = worker;
     this.renderer = renderer;
 
     this.mode = 'play';        // 'play' | 'edit' | 'pause'
@@ -18,17 +18,13 @@ class UI {
     this.updateStats();
   }
 
-  get stepsPerFrame() {
-    return this.SPEEDS[this.speedIndex];
-  }
-
   // ── Control bindings ──────────────────────────────────────────────────────
 
   _bindControls() {
     this._on('btn-play-pause', 'click', () => this._togglePlayPause());
     this._on('btn-reset',   'click', () => this._showResetModal());
     this._on('modal-cancel',  'click', () => this._hideResetModal());
-    this._on('modal-confirm', 'click', () => { this._hideResetModal(); this.sim.reset(); this._setMode('play'); });
+    this._on('modal-confirm', 'click', () => { this._hideResetModal(); this.worker.postMessage({ type: 'reset' }); });
     document.getElementById('modal-reset').addEventListener('click', e => {
       if (e.target === e.currentTarget) this._hideResetModal();
     });
@@ -191,13 +187,14 @@ class UI {
   }
 
   _exitEdit() {
-    this.sim.onMazeChanged();
+    this.worker.postMessage({ type: 'syncMaze', grid: this.maze.grid });
     this._setMode('play');
   }
 
   _setMode(m) {
     this.mode = m;
-    this.sim.paused = (m !== 'play');
+    if (m === 'play') this.worker.postMessage({ type: 'resume' });
+    else this.worker.postMessage({ type: 'pause' });
 
     const canvas = document.getElementById('gameCanvas');
     canvas.style.cursor = m === 'edit' ? 'crosshair' : 'default';
@@ -215,6 +212,7 @@ class UI {
     this.speedIndex = (this.speedIndex + 1) % this.SPEEDS.length;
     const btn = document.getElementById('btn-speed');
     if (btn) btn.textContent = `${this.SPEEDS[this.speedIndex]}×`;
+    this.worker.postMessage({ type: 'setSpeed', steps: this.SPEEDS[this.speedIndex] });
   }
 
   _syncButtons() {
