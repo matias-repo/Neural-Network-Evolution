@@ -68,7 +68,13 @@ class Renderer {
     ctx.fillStyle = 'rgba(130,140,180,0.7)';
     ctx.fillText(`${sim.episode + 1} / ${CONFIG.POP_SIZE}`, 6, 20);
 
+    // Version — bottom-right, very faint
     ctx.textBaseline = 'alphabetic';
+    ctx.textAlign    = 'right';
+    ctx.font         = '8px "Courier New", monospace';
+    ctx.fillStyle    = 'rgba(255,255,255,0.08)';
+    ctx.fillText(`v${VERSION}`, CONFIG.CANVAS_W - 5, CONFIG.CANVAS_H - 5);
+    ctx.textAlign    = 'left';
   }
 
   // ── Maze ──────────────────────────────────────────────────────────────────
