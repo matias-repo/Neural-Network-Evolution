@@ -151,16 +151,15 @@ class Simulation {
     const MAX_DIST = Math.hypot(CONFIG.CANVAS_W, CONFIG.CANVAS_H);
 
     // ── Predator fitness ─────────────────────────────────────────────────────
-    // Catch-speed bonus per prey. When neither caught, use proximity shaping so
-    // the GA has a gradient to climb from generation 1.
+    // Catch-speed bonus per prey caught, always supplemented by proximity shaping.
+    // Shaping is small enough that any catch always beats proximity alone, but it
+    // provides a gradient toward the second prey after the first is caught.
     const closeness      = Math.max(0, 1 - this._minDist / MAX_DIST);
     const proximityBonus = closeness * maxT * CONFIG.PRED_PROXIMITY_WEIGHT;
 
-    let predFit = 0;
+    let predFit = proximityBonus;  // always present as base gradient
     if (this._catch1Frame !== null) predFit += (maxT - this._catch1Frame) + maxT * 0.25;
     if (this._catch2Frame !== null) predFit += (maxT - this._catch2Frame) + maxT * 0.25;
-    // Proximity shaping only when no catches — avoids diluting the catch signal
-    if (predFit === 0) predFit = proximityBonus;
     this.predFitness[this.episode] = predFit;
 
     // ── Prey fitness ──────────────────────────────────────────────────────────
