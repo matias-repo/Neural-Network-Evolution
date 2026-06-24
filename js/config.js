@@ -34,6 +34,11 @@ const CONFIG = {
   // outputs 0-1: ax, ay   output 2: interact (tanh > 0.5 = pickup or place)
   NN_LAYERS: [17, 24, 14, 3],
 
+  // Fitness shaping
+  // Predator gets a proximity bonus proportional to its closest approach,
+  // so it has a gradient to climb even when it doesn't catch the prey.
+  PRED_PROXIMITY_WEIGHT: 0.4,   // closest-approach bonus = weight × EPISODE_FRAMES
+
   // Wall interaction
   WALL_INTERACT_COOLDOWN: 20,   // sim-frames between pickups / placements
   WALL_CARRY_SPEED: 0.65,       // max-speed multiplier while holding a wall

@@ -63,6 +63,7 @@ class Simulation {
     this.episode = idx;
     this.frame = 0;
     this.caught = false;
+    this._minDist = Infinity;
 
     this._restoreMaze();  // every episode starts from the user-defined baseline
 
@@ -92,6 +93,7 @@ class Simulation {
     this.prey.update(this.maze, this.predator);
 
     const dist = Math.hypot(this.predator.x - this.prey.x, this.predator.y - this.prey.y);
+    if (dist < this._minDist) this._minDist = dist;
     const episodeDone = dist <= CONFIG.CATCH_DIST || this.frame >= CONFIG.EPISODE_FRAMES;
 
     if (episodeDone) {
@@ -109,10 +111,15 @@ class Simulation {
     // Prey rewarded for surviving longer + wall interactions
     this.preyFitness[this.episode] = t + this.prey.wallInteractions * wb;
 
-    // Predator rewarded for catching quickly; always gets wall interaction bonus
+    // Predator: catch reward OR proximity shaping bonus (closest approach this episode).
+    // Shaping keeps the gradient non-zero even on misses so the GA has signal from gen 1.
+    const MAX_DIST = Math.hypot(CONFIG.CANVAS_W, CONFIG.CANVAS_H);
+    const closeness = Math.max(0, 1 - this._minDist / MAX_DIST);
+    const proximityBonus = closeness * maxT * CONFIG.PRED_PROXIMITY_WEIGHT;
+
     this.predFitness[this.episode] = this.caught
       ? (maxT - t) + maxT * 0.5 + this.predator.wallInteractions * wb
-      : this.predator.wallInteractions * wb;
+      : proximityBonus + this.predator.wallInteractions * wb;
 
     const nextEp = this.episode + 1;
     if (nextEp >= CONFIG.POP_SIZE) {
