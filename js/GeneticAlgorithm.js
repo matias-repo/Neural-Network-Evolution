@@ -15,6 +15,15 @@ class GeneticAlgorithm {
     const best = ranked[0].f;
     const avg = fitnesses.reduce((s, v) => s + v, 0) / fitnesses.length;
 
+    // Adaptive mutation: when the population has converged (all scores similar),
+    // boost mutation strength to escape the local optimum.
+    // cv (coefficient of variation) = stddev / mean. Low cv = tight cluster = converged.
+    // At cv=0 (identical scores) → 4× strength; scales linearly back to 1× at cv=0.15+.
+    const variance = fitnesses.reduce((s, v) => s + (v - avg) ** 2, 0) / fitnesses.length;
+    const cv = Math.sqrt(variance) / (avg + 1e-6);
+    const strengthBoost   = cv < 0.15 ? (4 - (cv / 0.15) * 3) : 1;
+    const effectiveStrength = this.mutationStrength * strengthBoost;
+
     const newPop = [];
 
     // Elitism – carry forward the best unchanged
@@ -24,7 +33,7 @@ class GeneticAlgorithm {
       const p1 = this._tournament(ranked);
       const p2 = this._tournament(ranked);
       const child = this._crossover(p1, p2);
-      this._mutate(child);
+      this._mutate(child, effectiveStrength);
       newPop.push(child);
     }
 
@@ -50,15 +59,14 @@ class GeneticAlgorithm {
     return child;
   }
 
-  _mutate(nn) {
+  _mutate(nn, strength = this.mutationStrength) {
     const w = nn.getWeights();
     for (let i = 0; i < w.length; i++) {
       if (Math.random() < this.mutationRate) {
-        // Gaussian perturbation
         const u1 = Math.random() || 1e-10;
         const u2 = Math.random();
         const gauss = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-        w[i] += gauss * this.mutationStrength;
+        w[i] += gauss * strength;
       }
     }
     nn.setWeights(w);
