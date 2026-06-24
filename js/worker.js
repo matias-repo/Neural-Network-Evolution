@@ -1,20 +1,9 @@
 importScripts('config.js', 'NeuralNetwork.js', 'GeneticAlgorithm.js', 'Maze.js');
 
-// Coordinator worker.  Spawns one episode-worker per logical CPU core
-// (minus one reserved for this coordinator) and distributes POP_SIZE
-// episodes across them every generation.
-
-const NUM_WORKERS = Math.max(1, (self.navigator?.hardwareConcurrency ?? 4) - 1);
-
-// ── Episode sub-workers ───────────────────────────────────────────────────
-const workers    = [];
-const workerBusy = [];
-for (let i = 0; i < NUM_WORKERS; i++) {
-  const w = new Worker('episode-worker.js');
-  w.onmessage = ({ data }) => onWorkerMsg(i, data);
-  workers.push(w);
-  workerBusy.push(false);
-}
+// Coordinator worker.  Episode workers are spawned by the MAIN THREAD
+// (to avoid nested-worker restrictions) and their messages are routed
+// through the main thread: coordinator → 'dispatch' → main → epWorker,
+// and epWorker → 'result'/'frame' → main → coordinator (with workerIdx).
 
 // ── Genetic algorithm ─────────────────────────────────────────────────────
 const ga = new GeneticAlgorithm({
@@ -40,8 +29,12 @@ let episodeQueue      = [];   // episode indices not yet dispatched this gen
 let completedEpisodes = 0;    // results received so far this gen
 let genId             = 0;    // bumped on reset so stale results are discarded
 
+// ── Worker pool (managed by main thread; coordinator just tracks busy state)
+let NUM_WORKERS = 1;
+let workerBusy  = [false];
+
 // ── Render / maze state ───────────────────────────────────────────────────
-let lastSnap    = null;        // { pred, prey, prey2 } from last worker-0 frame/result
+let lastSnap    = null;        // { pred, prey, prey2 } from last display-worker frame
 let displayEp   = 0;           // episode index worker-0 is currently rendering
 let mazeSave    = null;         // baseline grid (2-D number array) sent to every episode
 let mazeDirty   = false;
@@ -58,6 +51,8 @@ let lastFlushMs = 0;
 // ═══════════════════════════════════════════════════════════════════════════
 self.onmessage = ({ data: msg }) => {
   switch (msg.type) {
+
+    // Control messages from the main thread
     case 'restore':
       _initCoord(msg.config, msg.simState, msg.mazeState);
       paused = false;
@@ -90,13 +85,19 @@ self.onmessage = ({ data: msg }) => {
       mazeDirty = true;
       _resetGeneration();
       break;
+
+    // Episode-worker messages forwarded by the main thread (include workerIdx)
+    case 'frame':
+    case 'result':
+      _onEpisodeMsg(msg.workerIdx, msg);
+      break;
   }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Episode-worker message handler
+// Episode-worker message handler (routed via main thread)
 // ═══════════════════════════════════════════════════════════════════════════
-function onWorkerMsg(wIdx, data) {
+function _onEpisodeMsg(wIdx, data) {
   if (data.type === 'frame') {
     if (wIdx === 0) lastSnap = { pred: data.pred, prey: data.prey, prey2: data.prey2 };
     return;
@@ -125,7 +126,14 @@ function onWorkerMsg(wIdx, data) {
 // Initialisation
 // ═══════════════════════════════════════════════════════════════════════════
 function _initCoord(config, simState, mazeState) {
-  if (config) { Object.assign(CONFIG, config); cfgOverride = config; }
+  if (config) {
+    Object.assign(CONFIG, config);
+    cfgOverride = config;
+    if (config.NUM_WORKERS) {
+      NUM_WORKERS = config.NUM_WORKERS;
+      workerBusy  = new Array(NUM_WORKERS).fill(false);
+    }
+  }
 
   const tmpMaze = new Maze(CONFIG.COLS, CONFIG.ROWS, CONFIG.CELL_SIZE);
   if (mazeState) { try { tmpMaze.deserialize(mazeState); } catch (_) {} }
@@ -186,18 +194,15 @@ function _startGeneration() {
 
 function _resetGeneration() {
   genId++;
-  for (let i = 0; i < NUM_WORKERS; i++) workerBusy[i] = false;
+  workerBusy = new Array(NUM_WORKERS).fill(false);
   predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
-  if (!paused) _startGeneration();
-  else {
-    // Queue ready; dispatch when resumed
-    completedEpisodes = 0;
-    episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
-    displayEp = 0;
-    lastSnap  = null;
-  }
+  completedEpisodes = 0;
+  episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
+  displayEp = 0;
+  lastSnap  = null;
+  if (!paused) _dispatchIdle();
 }
 
 function _reset() {
@@ -205,7 +210,7 @@ function _reset() {
   generation  = 0;
   totalFrames = 0;
   history     = [];
-  for (let i = 0; i < NUM_WORKERS; i++) workerBusy[i] = false;
+  workerBusy  = new Array(NUM_WORKERS).fill(false);
   _initPopulations();
   completedEpisodes = 0;
   episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
@@ -215,21 +220,27 @@ function _reset() {
   if (!paused && initialized) _dispatchIdle();
 }
 
+// Send a 'dispatch' message to the main thread, which routes it to the
+// designated episode worker.
 function _dispatch(wIdx) {
   if (episodeQueue.length === 0) { workerBusy[wIdx] = false; return; }
   const epIdx = episodeQueue.shift();
   if (wIdx === 0) displayEp = epIdx;
   workerBusy[wIdx] = true;
-  workers[wIdx].postMessage({
-    type:     'run',
-    idx:      epIdx,
-    genId,
-    predW:    predPop[epIdx].getWeights(),
-    prey1W:   preyPop[epIdx].getWeights(),
-    prey2W:   preyPop2[epIdx].getWeights(),
-    mazeGrid: mazeSave,
-    config:   cfgOverride,
-    display:  wIdx === 0,
+  self.postMessage({
+    type:      'dispatch',
+    workerIdx: wIdx,
+    run: {
+      type:     'run',
+      idx:      epIdx,
+      genId,
+      predW:    predPop[epIdx].getWeights(),
+      prey1W:   preyPop[epIdx].getWeights(),
+      prey2W:   preyPop2[epIdx].getWeights(),
+      mazeGrid: mazeSave,
+      config:   cfgOverride,
+      display:  wIdx === 0,
+    },
   });
 }
 
@@ -265,7 +276,7 @@ function _evolve() {
     history,
   });
 
-  // Prepare next generation (always queue it up; dispatch only when not paused)
+  // Prepare next generation; dispatch only when not paused
   predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
