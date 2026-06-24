@@ -7,7 +7,10 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#0d0d1a" />
+  <meta name="apple-mobile-web-app-title" content="NNEvo" />
+  <meta name="theme-color" content="#080810" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <title>NNEvo</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -65,6 +68,13 @@
     </div>
   </div>
 </div>
+
+<!-- PWA service worker registration -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+  }
+</script>
 
 <!-- Scripts – order matters -->
 <script src="js/config.js"></script>
