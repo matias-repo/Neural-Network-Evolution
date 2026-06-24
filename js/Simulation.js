@@ -32,7 +32,8 @@ class Simulation {
     this.paused = false;
     this.caught = false;    // whether prey was caught this episode
 
-    this.onSave = null;
+    this.onSave    = null;
+    this._mazeSave = null;  // snapshot taken at ep 0 of each generation
     this._initPopulations();
     this._startEpisode(0);
   }
@@ -46,10 +47,30 @@ class Simulation {
     this.preyFitness = new Array(CONFIG.POP_SIZE).fill(0);
   }
 
+  _snapshotMaze() {
+    this._mazeSave = this.maze.grid.map(r => r.slice());
+  }
+
+  _restoreMaze() {
+    if (!this._mazeSave) return;
+    for (let r = 0; r < this.maze.rows; r++)
+      for (let c = 0; c < this.maze.cols; c++)
+        this.maze.grid[r][c] = this._mazeSave[r][c];
+    this.maze.dirty = true;
+  }
+
   _startEpisode(idx) {
     this.episode = idx;
     this.frame = 0;
     this.caught = false;
+
+    // Ep 0 locks in the maze for the whole generation; later eps restore it
+    // so every agent is tested against the same wall layout.
+    if (idx === 0) {
+      this._snapshotMaze();
+    } else {
+      this._restoreMaze();
+    }
 
     const predPos = this.maze.randomOpenPos(null, 0);
     const preyPos = this.maze.randomOpenPos(predPos, CONFIG.MIN_START_DIST);
@@ -171,8 +192,9 @@ class Simulation {
     }
   }
 
-  // Call when the maze changes so start positions are refreshed
+  // Call when the maze is externally edited so the new layout becomes the baseline
   onMazeChanged() {
+    this._snapshotMaze();
     this._startEpisode(this.episode);
   }
 
