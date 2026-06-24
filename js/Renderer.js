@@ -36,52 +36,34 @@ class Renderer {
     this._drawHUD(sim);
   }
 
-  // ── HUD overlay (top-right corner of canvas) ───────────────────────────────
+  // ── HUD overlay – hairline progress bar + quiet corner text ─────────────────
 
   _drawHUD(sim) {
     const ctx = this.ctx;
     const W   = CONFIG.CANVAS_W;
 
-    const padX = 7, padY = 7;
-    const boxW = 96, boxH = 38;
-    const x = W - boxW - padX;
-    const y = padY;
+    // Single 2-px progress line flush to the top edge of the canvas
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillRect(0, 0, W, 2);
+    ctx.fillStyle = 'rgba(120,150,255,0.85)';
+    ctx.fillRect(0, 0, Math.round(W * sim.episodeProgress), 2);
 
-    // Dark background
-    ctx.fillStyle = 'rgba(4, 4, 14, 0.88)';
-    ctx.fillRect(x, y, boxW, boxH);
+    // Quiet stats, top-left, no box. 1-px shadow keeps it legible over anything.
+    ctx.textBaseline = 'top';
 
-    // Accent bar on top (blue glow strip)
-    ctx.fillStyle = '#2a40a0';
-    ctx.fillRect(x, y, boxW, 2);
-    ctx.fillStyle = '#4060cc';
-    ctx.fillRect(x, y, boxW, 1);
+    ctx.font = 'bold 11px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillText(`GEN ${sim.generation}`, 7, 8);
+    ctx.fillStyle = 'rgba(208,214,238,0.9)';
+    ctx.fillText(`GEN ${sim.generation}`, 6, 7);
 
-    // Border lines
-    ctx.fillStyle = '#1a2458';
-    ctx.fillRect(x,          y + 2, 1,    boxH - 2);   // left
-    ctx.fillRect(x + boxW-1, y + 2, 1,    boxH - 2);   // right
-    ctx.fillRect(x,          y + boxH-1, boxW, 1);      // bottom
+    ctx.font = '9px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillText(`${sim.episode + 1} / ${CONFIG.POP_SIZE}`, 7, 21);
+    ctx.fillStyle = 'rgba(130,140,180,0.7)';
+    ctx.fillText(`${sim.episode + 1} / ${CONFIG.POP_SIZE}`, 6, 20);
 
-    // Generation
-    ctx.font      = 'bold 12px "Courier New", monospace';
-    ctx.fillStyle = '#ccd4ff';
-    ctx.fillText(`GEN ${sim.generation}`, x + 7, y + 16);
-
-    // Episode
-    ctx.font      = '9px "Courier New", monospace';
-    ctx.fillStyle = '#3a4468';
-    ctx.fillText(`EP ${sim.episode + 1} / ${CONFIG.POP_SIZE}`, x + 7, y + 27);
-
-    // Episode progress bar
-    const bx = x + 1, by = y + boxH - 5, bw = boxW - 2, bh = 3;
-    ctx.fillStyle = '#080e28';
-    ctx.fillRect(bx, by, bw, bh);
-    ctx.fillStyle = '#2848b8';
-    ctx.fillRect(bx, by, Math.floor(bw * sim.episodeProgress), bh);
-    // Highlight on progress fill
-    ctx.fillStyle = 'rgba(100,140,255,0.4)';
-    ctx.fillRect(bx, by, Math.floor(bw * sim.episodeProgress), 1);
+    ctx.textBaseline = 'alphabetic';
   }
 
   // ── Maze ──────────────────────────────────────────────────────────────────
@@ -90,18 +72,18 @@ class Renderer {
     const ctx = this.ctx;
     const cs  = maze.cellSize;
 
-    // Floor – single solid fill
-    ctx.fillStyle = '#07070f';
+    // Floor – near-black, no texture
+    ctx.fillStyle = '#080810';
     ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
 
-    // Walls – flat blocks with a single 1px top edge highlight
+    // Walls – muted neutral slate, flat, single 1px top edge
     for (let r = 0; r < maze.rows; r++) {
       for (let c = 0; c < maze.cols; c++) {
         if (!maze.grid[r][c]) continue;
         const x = c * cs, y = r * cs;
-        ctx.fillStyle = '#1a2260';
+        ctx.fillStyle = '#1c1c2e';
         ctx.fillRect(x, y, cs, cs);
-        ctx.fillStyle = '#2a3880';
+        ctx.fillStyle = '#28283e';
         ctx.fillRect(x, y, cs, 1);
       }
     }
@@ -152,26 +134,16 @@ class Renderer {
     // Character sprite
     drawSprite(this.ctx, frame, pal, cx, cy, scale, flip);
 
-    // Carried-wall indicator: mini block hovering in front of the agent
+    // Carried-wall indicator: small flat block in front of agent
     if (agent.carryingWall) {
-      const front  = agent.facingLeft ? -1 : 1;
-      const bw     = scale * 4, bh = scale * 4;
-      const bx     = cx + front * (scale * 5 + 1) - Math.floor(bw / 2);
-      const by     = cy - Math.floor(bh / 2);
-      this.ctx.fillStyle = '#182058';
+      const front = agent.facingLeft ? -1 : 1;
+      const bw = scale * 3, bh = scale * 3;
+      const bx = cx + front * (scale * 6) - Math.floor(bw / 2);
+      const by = cy - Math.floor(bh / 2);
+      this.ctx.fillStyle = '#1c1c2e';
       this.ctx.fillRect(bx, by, bw, bh);
-      // Highlights
-      this.ctx.fillStyle = '#2c4090';
+      this.ctx.fillStyle = '#38385a';
       this.ctx.fillRect(bx, by, bw, 1);
-      this.ctx.fillStyle = '#1e2e78';
-      this.ctx.fillRect(bx, by, 1, bh);
-      // Shadows
-      this.ctx.fillStyle = '#080e28';
-      this.ctx.fillRect(bx, by + bh - 1, bw, 1);
-      this.ctx.fillRect(bx + bw - 1, by, 1, bh);
-      // Mortar crack
-      this.ctx.fillStyle = '#0d1440';
-      this.ctx.fillRect(bx + 1, by + Math.floor(bh / 2), bw - 2, 1);
     }
   }
 

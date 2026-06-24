@@ -1,15 +1,15 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:        #06060f;
-  --panel:     #0a0a1e;
-  --border:    #1a2458;
-  --text:      #a8acd4;
-  --text-dim:  #363860;
-  --btn-bg:    #0e0e28;
-  --btn-hover: #181838;
-  --btn-act:   #1e2a80;
-  --accent:    #3a58e0;
+  --bg:        #080810;
+  --panel:     #0d0d18;
+  --border:    #1e1e30;
+  --text:      #8890b0;
+  --text-dim:  #2e2e48;
+  --btn-bg:    #0d0d1a;
+  --btn-hover: #141428;
+  --btn-act:   #1a2060;
+  --accent:    #4060d0;
   --w:         360px;
 }
 
@@ -33,15 +33,15 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 6px 5px;
-  border-bottom: 1px solid rgba(26, 36, 88, 0.6);
+  padding: 6px 6px 5px;
+  border-bottom: 1px solid rgba(30, 30, 48, 0.8);
 }
 
 .logo {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 4px;
-  color: #2a3060;
+  color: #22223a;
   text-transform: uppercase;
   user-select: none;
   flex-shrink: 0;
@@ -57,42 +57,43 @@ body {
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 
 button {
-  background: var(--btn-bg);
-  color: var(--text);
-  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid transparent;
   border-radius: 2px;
   padding: 5px 9px;
   font-family: inherit;
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
   white-space: nowrap;
-  min-height: 32px;
+  min-height: 30px;
   -webkit-tap-highlight-color: transparent;
   letter-spacing: 0.3px;
 }
 
-button:hover  {
+button:hover {
+  color: var(--text);
+  border-color: var(--border);
   background: var(--btn-hover);
-  border-color: #2a3878;
-  color: #c0c8f0;
 }
 button.active {
+  color: #a0b4ff;
+  border-color: #2a3878;
   background: var(--btn-act);
-  border-color: var(--accent);
-  color: #d0d8ff;
 }
-button.dim-btn { color: var(--text-dim); }
-button.dim-btn:hover { color: var(--text); }
+button.dim-btn { color: #1e1e38; }
+button.dim-btn:hover { color: var(--text-dim); }
 
 .ctrl-btn  { padding: 5px 7px; }
 .speed-btn {
   min-width: 36px;
   text-align: center;
   font-weight: 700;
-  color: #6880d8;
+  color: #404878;
   letter-spacing: 0;
 }
+.speed-btn:hover { color: var(--text); }
 
 .divider {
   width: 1px;
@@ -130,12 +131,8 @@ button.dim-btn:hover { color: var(--text); }
   position: relative;
   width: var(--w);
   line-height: 0;
-  border: 1px solid #141e4a;
-  border-top: 1px solid #1e2c60;
-  box-shadow:
-    0 0 0 1px rgba(10, 12, 40, 0.9),
-    0 8px 60px rgba(10, 18, 60, 0.9),
-    0 0 80px rgba(20, 30, 100, 0.4);
+  border: 1px solid #141420;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.7);
 }
 
 #gameCanvas {
