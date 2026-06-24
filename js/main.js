@@ -29,11 +29,15 @@ function init() {
   const NUM_WORKERS = Math.max(1, (navigator.hardwareConcurrency ?? 4) - 1);
   const coordinator = new Worker('js/worker.js');
 
+  // Create a MessageChannel per episode worker so coordinator and episode workers
+  // communicate directly — no main-thread routing bottleneck.
+  const channels = Array.from({ length: NUM_WORKERS }, () => new MessageChannel());
+
   const epWorkers = Array.from({ length: NUM_WORKERS }, (_, i) => {
     const w = new Worker('js/episode-worker.js');
-    // Forward episode results/frames to the coordinator, tagging with workerIdx
-    w.onmessage = ({ data }) => coordinator.postMessage({ ...data, workerIdx: i });
-    w.onerror   = (e) => console.error(`[epWorker ${i}] error:`, e.message, e);
+    // Hand the worker its end of the channel; coordinator holds the other end.
+    w.postMessage({ type: 'init', port: channels[i].port2 }, [channels[i].port2]);
+    w.onerror = (e) => console.error(`[epWorker ${i}] error:`, e.message, e);
     return w;
   });
 
@@ -42,13 +46,6 @@ function init() {
   coordinator.onerror = (e) => console.error('[coordinator] error:', e.message, e);
 
   coordinator.onmessage = ({ data }) => {
-    if (data.type === 'dispatch') {
-      // Route a 'run' command from the coordinator to the right episode worker
-      const w = epWorkers[data.workerIdx];
-      if (!w) { console.error('[main] dispatch to unknown workerIdx', data.workerIdx); return; }
-      w.postMessage(data.run);
-      return;
-    }
     if (data.type === 'frame') {
       lastState = data;
       if (data.maze) {
@@ -75,6 +72,8 @@ function init() {
     try { return JSON.parse(localStorage.getItem('nn-evo-state')); } catch (_) { return null; }
   })();
   const mazeState = localStorage.getItem('nn-evo-maze');
+  // Transfer coordinator ends of all channels so it can dispatch directly to episode workers.
+  const port1s = channels.map(ch => ch.port1);
   coordinator.postMessage({
     type: 'restore',
     config: {
@@ -85,7 +84,8 @@ function init() {
     },
     simState,
     mazeState,
-  });
+    ports: port1s,
+  }, port1s);
   coordinator.postMessage({ type: 'setSpeed', steps: ui.SPEEDS[ui.speedIndex] });
 
   function loop() {

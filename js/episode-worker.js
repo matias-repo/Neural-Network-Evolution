@@ -1,11 +1,17 @@
 importScripts('config.js', 'NeuralNetwork.js', 'Maze.js', 'Agent.js');
 
-// Stateless episode runner. Receives one 'run' message, simulates the full
+// Stateless episode runner. Receives one 'run' message via its MessageChannel
+// port (handed over by the main thread during init), simulates the full
 // episode, and returns a 'result'. If display=true, also sends 'frame'
-// messages every ~16 ms for the main thread to render.
+// messages every ~16 ms for rendering.
+
+let port = null;
 
 self.onmessage = ({ data: msg }) => {
-  if (msg.type === 'run') runEpisode(msg);
+  if (msg.type === 'init') {
+    port = msg.port;
+    port.onmessage = ({ data }) => { if (data.type === 'run') runEpisode(data); };
+  }
 };
 
 function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, display }) {
@@ -68,7 +74,7 @@ function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, displ
     if (display) {
       const now = Date.now();
       if (now - lastPost >= 16) {
-        self.postMessage({ type: 'frame', idx, frame,
+        port.postMessage({ type: 'frame', idx, frame,
           pred: snap(predator), prey: snap(prey1), prey2: snap(prey2) });
         lastPost = now;
       }
@@ -87,7 +93,7 @@ function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, displ
   const prey1Fit = (catch1Frame ?? maxT) + Math.min(1, prey1MinDist / MAX_DIST) * maxT * 0.15;
   const prey2Fit = (catch2Frame ?? maxT) + Math.min(1, prey2MinDist / MAX_DIST) * maxT * 0.15;
 
-  self.postMessage({ type: 'result', idx, genId, predFit, prey1Fit, prey2Fit, frame,
+  port.postMessage({ type: 'result', idx, genId, predFit, prey1Fit, prey2Fit, frame,
     pred: snap(predator), prey: snap(prey1), prey2: snap(prey2) });
 }
 

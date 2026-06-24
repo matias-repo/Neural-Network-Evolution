@@ -1,9 +1,9 @@
 importScripts('config.js', 'NeuralNetwork.js', 'GeneticAlgorithm.js', 'Maze.js');
 
 // Coordinator worker.  Episode workers are spawned by the MAIN THREAD
-// (to avoid nested-worker restrictions) and their messages are routed
-// through the main thread: coordinator → 'dispatch' → main → epWorker,
-// and epWorker → 'result'/'frame' → main → coordinator (with workerIdx).
+// (to avoid nested-worker restrictions).  Each episode worker gets a
+// MessageChannel port so coordinator ↔ episode workers communicate directly
+// without any main-thread routing overhead.
 
 // ── Genetic algorithm ─────────────────────────────────────────────────────
 const ga = new GeneticAlgorithm({
@@ -29,9 +29,10 @@ let episodeQueue      = [];   // episode indices not yet dispatched this gen
 let completedEpisodes = 0;    // results received so far this gen
 let genId             = 0;    // bumped on reset so stale results are discarded
 
-// ── Worker pool (managed by main thread; coordinator just tracks busy state)
+// ── Worker pool ───────────────────────────────────────────────────────────────
 let NUM_WORKERS = 1;
 let workerBusy  = [false];
+let ports       = [];   // direct MessagePort to each episode worker
 
 // ── Render / maze state ───────────────────────────────────────────────────
 let lastSnap    = null;        // { pred, prey, prey2 } from last display-worker frame
@@ -59,6 +60,15 @@ function _handleMessage(msg) {
 
     // Control messages from the main thread
     case 'restore':
+      // Wire up direct MessagePorts to episode workers
+      if (msg.ports && msg.ports.length) {
+        ports = msg.ports;
+        ports.forEach((port, i) => {
+          port.onmessage = ({ data }) => {
+            try { _onEpisodeMsg(i, data); } catch (err) { console.error('[coordinator] port onmessage error:', err); }
+          };
+        });
+      }
       _initCoord(msg.config, msg.simState, msg.mazeState);
       paused = false;
       break;
@@ -91,16 +101,11 @@ function _handleMessage(msg) {
       _resetGeneration();
       break;
 
-    // Episode-worker messages forwarded by the main thread (include workerIdx)
-    case 'frame':
-    case 'result':
-      _onEpisodeMsg(msg.workerIdx, msg);
-      break;
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Episode-worker message handler (routed via main thread)
+// Episode-worker message handler (called from port.onmessage — direct channel)
 // ═══════════════════════════════════════════════════════════════════════════
 function _onEpisodeMsg(wIdx, data) {
   if (data.type === 'frame') {
@@ -137,6 +142,7 @@ function _initCoord(config, simState, mazeState) {
     if (config.NUM_WORKERS) {
       NUM_WORKERS = config.NUM_WORKERS;
       workerBusy  = new Array(NUM_WORKERS).fill(false);
+      if (!ports.length) ports = new Array(NUM_WORKERS).fill(null);
     }
   }
 
@@ -225,27 +231,21 @@ function _reset() {
   if (!paused && initialized) _dispatchIdle();
 }
 
-// Send a 'dispatch' message to the main thread, which routes it to the
-// designated episode worker.
 function _dispatch(wIdx) {
   if (episodeQueue.length === 0) { workerBusy[wIdx] = false; return; }
   const epIdx = episodeQueue.shift();
   if (wIdx === 0) displayEp = epIdx;
   workerBusy[wIdx] = true;
-  self.postMessage({
-    type:      'dispatch',
-    workerIdx: wIdx,
-    run: {
-      type:     'run',
-      idx:      epIdx,
-      genId,
-      predW:    predPop[epIdx].getWeights(),
-      prey1W:   preyPop[epIdx].getWeights(),
-      prey2W:   preyPop2[epIdx].getWeights(),
-      mazeGrid: mazeSave,
-      config:   cfgOverride,
-      display:  wIdx === 0,
-    },
+  ports[wIdx].postMessage({
+    type:     'run',
+    idx:      epIdx,
+    genId,
+    predW:    predPop[epIdx].getWeights(),
+    prey1W:   preyPop[epIdx].getWeights(),
+    prey2W:   preyPop2[epIdx].getWeights(),
+    mazeGrid: mazeSave,
+    config:   cfgOverride,
+    display:  wIdx === 0,
   });
 }
 
