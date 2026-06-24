@@ -149,46 +149,22 @@ class UI {
   _cycleSpeed() {
     this.speedIndex = (this.speedIndex + 1) % this.SPEEDS.length;
     const btn = document.getElementById('btn-speed');
-    if (btn) btn.textContent = `Speed: ${this.SPEEDS[this.speedIndex]}×`;
+    if (btn) btn.textContent = `${this.SPEEDS[this.speedIndex]}×`;
   }
 
   _syncButtons() {
     const pp = document.getElementById('btn-play-pause');
-    if (pp) pp.textContent = this.mode === 'play' ? '⏸ Pause' : '▶ Play';
+    if (pp) pp.textContent = this.mode === 'play' ? '⏸' : '▶';
 
     const edit = document.getElementById('btn-edit');
     if (edit) edit.classList.toggle('active', this.mode === 'edit');
 
-    const editTools = document.getElementById('edit-tools');
-    if (editTools) editTools.style.display = this.mode === 'edit' ? 'flex' : 'none';
+    const bar = document.getElementById('edit-bar');
+    if (bar) bar.classList.toggle('visible', this.mode === 'edit');
   }
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
-
-  updateStats() {
-    const sim = this.sim;
-    this._setText('stat-gen', sim.generation);
-    this._setText('stat-episode', `${sim.episode + 1} / ${CONFIG.POP_SIZE}`);
-    this._setText('stat-frame', `${sim.frame} / ${CONFIG.EPISODE_FRAMES}`);
-
-    const predBest = sim.bestFitnessThisGen('predator').toFixed(0);
-    const predAvg = sim.avgFitnessThisGen('predator').toFixed(0);
-    const preyBest = sim.bestFitnessThisGen('prey').toFixed(0);
-    const preyAvg = sim.avgFitnessThisGen('prey').toFixed(0);
-
-    this._setText('stat-pred-best', predBest);
-    this._setText('stat-pred-avg', predAvg);
-    this._setText('stat-prey-best', preyBest);
-    this._setText('stat-prey-avg', preyAvg);
-
-    // Episode progress bar
-    const bar = document.getElementById('ep-progress');
-    if (bar) bar.style.width = `${sim.episodeProgress * 100}%`;
-
-    // Chart
-    const chartCanvas = document.getElementById('fitnessChart');
-    if (chartCanvas) this.renderer.drawChart(chartCanvas, sim.history);
-  }
+  // Stats are now rendered as a HUD overlay on the canvas; nothing to update in DOM.
+  updateStats() {}
 
   // ── Utilities ─────────────────────────────────────────────────────────────
 

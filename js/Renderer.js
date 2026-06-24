@@ -32,6 +32,51 @@ class Renderer {
       this._drawCharacter(sim.prey,     dist, sim.totalFrames);
       this._drawCharacter(sim.predator, dist, sim.totalFrames);
     }
+
+    this._drawHUD(sim);
+  }
+
+  // ── HUD overlay (top-right corner of canvas) ───────────────────────────────
+
+  _drawHUD(sim) {
+    const ctx = this.ctx;
+    const W = CONFIG.CANVAS_W;
+
+    const genStr = `GEN ${sim.generation}`;
+    const epStr  = `EP ${sim.episode + 1}/${CONFIG.POP_SIZE}`;
+
+    const padX = 8, padY = 8;
+    const boxW = 90, boxH = 34;
+    const x = W - boxW - padX;
+    const y = padY;
+
+    // Background
+    ctx.fillStyle = 'rgba(6, 6, 18, 0.82)';
+    ctx.fillRect(x, y, boxW, boxH);
+
+    // Border (1 px)
+    ctx.fillStyle = '#1e2a5e';
+    ctx.fillRect(x, y, boxW, 1);
+    ctx.fillRect(x, y, 1, boxH);
+    ctx.fillRect(x + boxW - 1, y, 1, boxH);
+    ctx.fillRect(x, y + boxH - 1, boxW, 1);
+
+    // Gen number
+    ctx.font = 'bold 11px "Courier New", monospace';
+    ctx.fillStyle = '#c0c8ff';
+    ctx.fillText(genStr, x + 6, y + 13);
+
+    // Episode label
+    ctx.font = '10px "Courier New", monospace';
+    ctx.fillStyle = '#505880';
+    ctx.fillText(epStr, x + 6, y + 24);
+
+    // Episode progress bar
+    const barX = x + 1, barY = y + boxH - 4, barW = boxW - 2, barH = 3;
+    ctx.fillStyle = '#0f1030';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#3355cc';
+    ctx.fillRect(barX, barY, Math.floor(barW * sim.episodeProgress), barH);
   }
 
   // ── Maze ──────────────────────────────────────────────────────────────────
