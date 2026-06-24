@@ -1,4 +1,4 @@
-const CACHE = 'nnevo-v0.9';
+const CACHE = 'nnevo-v1.0';
 
 const ASSETS = [
   './',
@@ -16,6 +16,7 @@ const ASSETS = [
   'js/UI.js',
   'js/main.js',
   'js/worker.js',
+  'js/episode-worker.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
 ];

@@ -1,47 +1,70 @@
-importScripts(
-  'config.js',
-  'NeuralNetwork.js',
-  'GeneticAlgorithm.js',
-  'Maze.js',
-  'Agent.js',
-  'Simulation.js'
-);
+importScripts('config.js', 'NeuralNetwork.js', 'GeneticAlgorithm.js', 'Maze.js');
 
-// Maze and sim created lazily on first 'restore' so the main thread can
-// send screen-computed dimensions before anything is initialised.
-let maze = null;
-let sim  = null;
+// Coordinator worker.  Spawns one episode-worker per logical CPU core
+// (minus one reserved for this coordinator) and distributes POP_SIZE
+// episodes across them every generation.
 
-let paused        = true;
-let stepsPerBatch = 1;
-let lastPostMs    = 0;
-let lastTickMs    = 0;
-let tickStarted   = false;
+const NUM_WORKERS = Math.max(1, (self.navigator?.hardwareConcurrency ?? 4) - 1);
 
-function _initSim(configOverride) {
-  if (configOverride) Object.assign(CONFIG, configOverride);
-  maze = new Maze(CONFIG.COLS, CONFIG.ROWS, CONFIG.CELL_SIZE);
-  sim  = new Simulation(maze);
-  sim.onSave = (data) => self.postMessage({ type: 'save', simState: data });
-  if (!tickStarted) { tickStarted = true; tick(); }
+// ── Episode sub-workers ───────────────────────────────────────────────────
+const workers    = [];
+const workerBusy = [];
+for (let i = 0; i < NUM_WORKERS; i++) {
+  const w = new Worker('episode-worker.js');
+  w.onmessage = ({ data }) => onWorkerMsg(i, data);
+  workers.push(w);
+  workerBusy.push(false);
 }
 
+// ── Genetic algorithm ─────────────────────────────────────────────────────
+const ga = new GeneticAlgorithm({
+  popSize:          CONFIG.POP_SIZE,
+  mutationRate:     CONFIG.MUTATION_RATE,
+  mutationStrength: CONFIG.MUTATION_STRENGTH,
+  eliteCount:       CONFIG.ELITE_COUNT,
+});
+
+// ── Population state ──────────────────────────────────────────────────────
+let predPop   = [];
+let preyPop   = [];
+let preyPop2  = [];
+let predFitness  = [];
+let preyFitness  = [];
+let prey2Fitness = [];
+let generation   = 0;
+let totalFrames  = 0;
+let history      = [];
+
+// ── Generation bookkeeping ────────────────────────────────────────────────
+let episodeQueue      = [];   // episode indices not yet dispatched this gen
+let completedEpisodes = 0;    // results received so far this gen
+let genId             = 0;    // bumped on reset so stale results are discarded
+
+// ── Render / maze state ───────────────────────────────────────────────────
+let lastSnap    = null;        // { pred, prey, prey2 } from last worker-0 frame/result
+let displayEp   = 0;           // episode index worker-0 is currently rendering
+let mazeSave    = null;         // baseline grid (2-D number array) sent to every episode
+let mazeDirty   = false;
+let cfgOverride = null;         // layout config forwarded to episode workers
+
+// ── Control ───────────────────────────────────────────────────────────────
+let paused      = true;
+let initialized = false;
+let tickStarted = false;
+let lastFlushMs = 0;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Main-thread message handler
+// ═══════════════════════════════════════════════════════════════════════════
 self.onmessage = ({ data: msg }) => {
   switch (msg.type) {
-
     case 'restore':
-      _initSim(msg.config);             // apply layout config and create sim
-      if (msg.mazeState) {
-        try { maze.deserialize(msg.mazeState); } catch (_) {}
-      }
-      sim._snapshotMaze();
-      if (msg.simState) sim.tryRestore(msg.simState);
+      _initCoord(msg.config, msg.simState, msg.mazeState);
       paused = false;
-      flush(true);
       break;
 
     case 'setSpeed':
-      stepsPerBatch = msg.steps;
+      // All cores run at max speed in parallel mode; speed setting ignored.
       break;
 
     case 'pause':
@@ -49,73 +72,242 @@ self.onmessage = ({ data: msg }) => {
       break;
 
     case 'resume':
-      paused = false;
+      if (paused) {
+        paused = false;
+        if (initialized) _dispatchIdle();
+      }
       break;
 
     case 'reset':
-      if (sim) { sim.reset(); flush(true); }
+      _reset();
       break;
 
     case 'syncMaze':
-      if (!maze) break;
-      for (let r = 0; r < maze.rows; r++)
-        for (let c = 0; c < maze.cols; c++)
-          maze.grid[r][c] = msg.grid[r][c];
-      sim.onMazeChanged();
-      flush(true);
+      if (!mazeSave) break;
+      for (let r = 0; r < mazeSave.length; r++)
+        for (let c = 0; c < mazeSave[r].length; c++)
+          mazeSave[r][c] = msg.grid[r][c];
+      mazeDirty = true;
+      _resetGeneration();
       break;
   }
 };
 
-function agentSnap(agent) {
-  if (!agent) return null;
-  return {
-    type:         agent.type,
-    x:            agent.x,
-    y:            agent.y,
-    vx:           agent.vx,
-    vy:           agent.vy,
-    speed:        agent.speed,
-    facingLeft:   agent.facingLeft,
-    carryingWall: agent.carryingWall,
-    alive:        agent.alive,
-  };
+// ═══════════════════════════════════════════════════════════════════════════
+// Episode-worker message handler
+// ═══════════════════════════════════════════════════════════════════════════
+function onWorkerMsg(wIdx, data) {
+  if (data.type === 'frame') {
+    if (wIdx === 0) lastSnap = { pred: data.pred, prey: data.prey, prey2: data.prey2 };
+    return;
+  }
+  if (data.type !== 'result') return;
+  if (data.genId !== genId) return;  // stale result from a superseded generation
+
+  predFitness[data.idx]  = data.predFit;
+  preyFitness[data.idx]  = data.prey1Fit;
+  prey2Fitness[data.idx] = data.prey2Fit;
+  totalFrames += data.frame;
+  completedEpisodes++;
+
+  if (wIdx === 0) lastSnap = { pred: data.pred, prey: data.prey, prey2: data.prey2 };
+
+  if (completedEpisodes >= CONFIG.POP_SIZE) {
+    _evolve();
+  } else if (!paused) {
+    _dispatch(wIdx);
+  } else {
+    workerBusy[wIdx] = false;
+  }
 }
 
-function flush(includeMaze) {
-  if (!sim) return;
-  const msg = {
-    type:            'frame',
-    pred:            agentSnap(sim.predator),
-    prey:            agentSnap(sim.prey),
-    prey2:           agentSnap(sim.prey2),
-    generation:      sim.generation,
-    episode:         sim.episode,
-    episodeProgress: sim.episodeProgress,
-    totalFrames:     sim.totalFrames,
-    history:         sim.history,
-  };
-  if (includeMaze || maze.dirty) {
-    msg.maze = maze.grid.map(row => row.slice());
-    maze.dirty = false;
+// ═══════════════════════════════════════════════════════════════════════════
+// Initialisation
+// ═══════════════════════════════════════════════════════════════════════════
+function _initCoord(config, simState, mazeState) {
+  if (config) { Object.assign(CONFIG, config); cfgOverride = config; }
+
+  const tmpMaze = new Maze(CONFIG.COLS, CONFIG.ROWS, CONFIG.CELL_SIZE);
+  if (mazeState) { try { tmpMaze.deserialize(mazeState); } catch (_) {} }
+  mazeSave  = tmpMaze.grid.map(r => r.slice());
+  mazeDirty = true;
+
+  _initPopulations();
+  if (simState) _tryRestore(simState);
+
+  initialized = true;
+  _startGeneration();
+
+  if (!tickStarted) { tickStarted = true; tick(); }
+}
+
+function _initPopulations() {
+  predPop  = Array.from({ length: CONFIG.POP_SIZE }, () => new NeuralNetwork(CONFIG.PRED_NN_LAYERS));
+  preyPop  = Array.from({ length: CONFIG.POP_SIZE }, () => new NeuralNetwork(CONFIG.PREY_NN_LAYERS));
+  preyPop2 = Array.from({ length: CONFIG.POP_SIZE }, () => new NeuralNetwork(CONFIG.PREY_NN_LAYERS));
+  predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
+}
+
+function _tryRestore(data) {
+  try {
+    if (!data) return false;
+    if (!data.predPop  || data.predPop.length  !== CONFIG.POP_SIZE) return false;
+    if (!data.preyPop  || data.preyPop.length  !== CONFIG.POP_SIZE) return false;
+    if (!data.preyPop2 || data.preyPop2.length !== CONFIG.POP_SIZE) return false;
+    const expPredLen = predPop[0].getWeights().length;
+    const expPreyLen = preyPop[0].getWeights().length;
+    if (data.predPop[0].length  !== expPredLen) return false;
+    if (data.preyPop[0].length  !== expPreyLen) return false;
+    if (data.preyPop2[0].length !== expPreyLen) return false;
+    generation = data.generation || 0;
+    history    = data.history    || [];
+    data.predPop.forEach( (w, i) => predPop[i].setWeights(w));
+    data.preyPop.forEach( (w, i) => preyPop[i].setWeights(w));
+    data.preyPop2.forEach((w, i) => preyPop2[i].setWeights(w));
+    predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+    preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+    prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
+    return true;
+  } catch (_) { return false; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Generation management
+// ═══════════════════════════════════════════════════════════════════════════
+function _startGeneration() {
+  completedEpisodes = 0;
+  episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
+  displayEp = 0;
+  lastSnap  = null;
+  _dispatchIdle();
+}
+
+function _resetGeneration() {
+  genId++;
+  for (let i = 0; i < NUM_WORKERS; i++) workerBusy[i] = false;
+  predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
+  if (!paused) _startGeneration();
+  else {
+    // Queue ready; dispatch when resumed
+    completedEpisodes = 0;
+    episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
+    displayEp = 0;
+    lastSnap  = null;
   }
-  self.postMessage(msg);
+}
+
+function _reset() {
+  genId++;
+  generation  = 0;
+  totalFrames = 0;
+  history     = [];
+  for (let i = 0; i < NUM_WORKERS; i++) workerBusy[i] = false;
+  _initPopulations();
+  completedEpisodes = 0;
+  episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
+  displayEp = 0;
+  lastSnap  = null;
+  _postSave(null);
+  if (!paused && initialized) _dispatchIdle();
+}
+
+function _dispatch(wIdx) {
+  if (episodeQueue.length === 0) { workerBusy[wIdx] = false; return; }
+  const epIdx = episodeQueue.shift();
+  if (wIdx === 0) displayEp = epIdx;
+  workerBusy[wIdx] = true;
+  workers[wIdx].postMessage({
+    type:     'run',
+    idx:      epIdx,
+    genId,
+    predW:    predPop[epIdx].getWeights(),
+    prey1W:   preyPop[epIdx].getWeights(),
+    prey2W:   preyPop2[epIdx].getWeights(),
+    mazeGrid: mazeSave,
+    config:   cfgOverride,
+    display:  wIdx === 0,
+  });
+}
+
+function _dispatchIdle() {
+  for (let i = 0; i < NUM_WORKERS; i++) {
+    if (!workerBusy[i]) _dispatch(i);
+  }
+}
+
+function _evolve() {
+  const predResult  = ga.evolve(predPop,  predFitness);
+  const preyResult  = ga.evolve(preyPop,  preyFitness);
+  const prey2Result = ga.evolve(preyPop2, prey2Fitness);
+
+  history.push({
+    gen:      generation,
+    predBest: predResult.best,
+    predAvg:  predResult.avg,
+    preyBest: Math.max(preyResult.best, prey2Result.best),
+    preyAvg:  (preyResult.avg + prey2Result.avg) / 2,
+  });
+
+  predPop  = predResult.population;
+  preyPop  = preyResult.population;
+  preyPop2 = prey2Result.population;
+  generation++;
+
+  _postSave({
+    generation,
+    predPop:  predPop.map(nn  => nn.getWeights()),
+    preyPop:  preyPop.map(nn  => nn.getWeights()),
+    preyPop2: preyPop2.map(nn => nn.getWeights()),
+    history,
+  });
+
+  // Prepare next generation (always queue it up; dispatch only when not paused)
+  predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
+  completedEpisodes = 0;
+  episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
+  displayEp = 0;
+  lastSnap  = null;
+
+  if (!paused) _dispatchIdle();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Flush / render loop
+// ═══════════════════════════════════════════════════════════════════════════
+function _postSave(data) {
+  self.postMessage({ type: 'save', simState: data });
 }
 
 function tick() {
   const now = Date.now();
-  if (sim && !paused) {
-    // Speeds < 100 are rate-limited to ~60 batches/sec to match the old RAF cadence.
-    // Speeds >= 100 run as fast as the CPU allows (the whole point of the worker).
-    const throttled = stepsPerBatch < 100;
-    if (!throttled || now - lastTickMs >= 16) {
-      for (let i = 0; i < stepsPerBatch; i++) sim._step();
-      lastTickMs = now;
-    }
-  }
-  if (sim && now - lastPostMs >= 16) {
-    flush(false);
-    lastPostMs = now;
+  if (now - lastFlushMs >= 16) {
+    _flush();
+    lastFlushMs = now;
   }
   setTimeout(tick, 0);
+}
+
+function _flush() {
+  const msg = {
+    type:            'frame',
+    pred:            lastSnap ? lastSnap.pred  : null,
+    prey:            lastSnap ? lastSnap.prey  : null,
+    prey2:           lastSnap ? lastSnap.prey2 : null,
+    generation,
+    episode:         displayEp,
+    episodeProgress: CONFIG.POP_SIZE > 0 ? completedEpisodes / CONFIG.POP_SIZE : 0,
+    totalFrames,
+    history,
+  };
+  if (mazeDirty && mazeSave) {
+    msg.maze = mazeSave.map(r => r.slice());
+    mazeDirty = false;
+  }
+  self.postMessage(msg);
 }

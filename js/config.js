@@ -1,4 +1,4 @@
-const VERSION = '0.9';
+const VERSION = '1.0';
 
 const CONFIG = {
   // Grid – portrait 18×30 at 20 px = 360×600
