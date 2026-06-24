@@ -40,43 +40,48 @@ class Renderer {
 
   _drawHUD(sim) {
     const ctx = this.ctx;
-    const W = CONFIG.CANVAS_W;
+    const W   = CONFIG.CANVAS_W;
 
-    const genStr = `GEN ${sim.generation}`;
-    const epStr  = `EP ${sim.episode + 1}/${CONFIG.POP_SIZE}`;
-
-    const padX = 8, padY = 8;
-    const boxW = 90, boxH = 34;
+    const padX = 7, padY = 7;
+    const boxW = 96, boxH = 38;
     const x = W - boxW - padX;
     const y = padY;
 
-    // Background
-    ctx.fillStyle = 'rgba(6, 6, 18, 0.82)';
+    // Dark background
+    ctx.fillStyle = 'rgba(4, 4, 14, 0.88)';
     ctx.fillRect(x, y, boxW, boxH);
 
-    // Border (1 px)
-    ctx.fillStyle = '#1e2a5e';
+    // Accent bar on top (blue glow strip)
+    ctx.fillStyle = '#2a40a0';
+    ctx.fillRect(x, y, boxW, 2);
+    ctx.fillStyle = '#4060cc';
     ctx.fillRect(x, y, boxW, 1);
-    ctx.fillRect(x, y, 1, boxH);
-    ctx.fillRect(x + boxW - 1, y, 1, boxH);
-    ctx.fillRect(x, y + boxH - 1, boxW, 1);
 
-    // Gen number
-    ctx.font = 'bold 11px "Courier New", monospace';
-    ctx.fillStyle = '#c0c8ff';
-    ctx.fillText(genStr, x + 6, y + 13);
+    // Border lines
+    ctx.fillStyle = '#1a2458';
+    ctx.fillRect(x,          y + 2, 1,    boxH - 2);   // left
+    ctx.fillRect(x + boxW-1, y + 2, 1,    boxH - 2);   // right
+    ctx.fillRect(x,          y + boxH-1, boxW, 1);      // bottom
 
-    // Episode label
-    ctx.font = '10px "Courier New", monospace';
-    ctx.fillStyle = '#505880';
-    ctx.fillText(epStr, x + 6, y + 24);
+    // Generation
+    ctx.font      = 'bold 12px "Courier New", monospace';
+    ctx.fillStyle = '#ccd4ff';
+    ctx.fillText(`GEN ${sim.generation}`, x + 7, y + 16);
+
+    // Episode
+    ctx.font      = '9px "Courier New", monospace';
+    ctx.fillStyle = '#3a4468';
+    ctx.fillText(`EP ${sim.episode + 1} / ${CONFIG.POP_SIZE}`, x + 7, y + 27);
 
     // Episode progress bar
-    const barX = x + 1, barY = y + boxH - 4, barW = boxW - 2, barH = 3;
-    ctx.fillStyle = '#0f1030';
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.fillStyle = '#3355cc';
-    ctx.fillRect(barX, barY, Math.floor(barW * sim.episodeProgress), barH);
+    const bx = x + 1, by = y + boxH - 5, bw = boxW - 2, bh = 3;
+    ctx.fillStyle = '#080e28';
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#2848b8';
+    ctx.fillRect(bx, by, Math.floor(bw * sim.episodeProgress), bh);
+    // Highlight on progress fill
+    ctx.fillStyle = 'rgba(100,140,255,0.4)';
+    ctx.fillRect(bx, by, Math.floor(bw * sim.episodeProgress), 1);
   }
 
   // ── Maze ──────────────────────────────────────────────────────────────────
@@ -85,45 +90,59 @@ class Renderer {
     const ctx = this.ctx;
     const cs  = maze.cellSize;
 
-    // Floor – subtle two-tone checkerboard at cell level
+    // Floor – dark stone tiles with faint corner insets for depth
     for (let r = 0; r < maze.rows; r++) {
       for (let c = 0; c < maze.cols; c++) {
-        ctx.fillStyle = (r + c) % 2 === 0 ? '#0d0d1a' : '#0f101e';
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#07070e' : '#09091a';
         ctx.fillRect(c * cs, r * cs, cs, cs);
+        // Subtle 1-px inset shadow on top-left of each tile
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(c * cs, r * cs, cs, 1);
+        ctx.fillRect(c * cs, r * cs, 1, cs);
+        // Tiny highlight on bottom-right
+        ctx.fillStyle = 'rgba(255,255,255,0.025)';
+        ctx.fillRect(c * cs + cs - 1, r * cs, 1, cs);
+        ctx.fillRect(c * cs, r * cs + cs - 1, cs, 1);
       }
     }
 
-    // Walls with pixel-art brick shading
+    // Walls – dark crystal/stone blocks
     for (let r = 0; r < maze.rows; r++) {
       for (let c = 0; c < maze.cols; c++) {
         if (!maze.grid[r][c]) continue;
         const x = c * cs, y = r * cs;
 
-        // Base wall
-        ctx.fillStyle = '#1a2460';
+        // Base
+        ctx.fillStyle = '#182058';
         ctx.fillRect(x, y, cs, cs);
 
-        // Top-left bevel highlight (1 px)
-        ctx.fillStyle = '#3050a8';
-        ctx.fillRect(x,     y,     cs, 1);
-        ctx.fillStyle = '#243490';
-        ctx.fillRect(x,     y + 1, 1, cs - 1);
+        // Top highlight
+        ctx.fillStyle = '#2c4090';
+        ctx.fillRect(x, y, cs, 1);
+        // Left highlight
+        ctx.fillStyle = '#1e2e78';
+        ctx.fillRect(x, y + 1, 1, cs - 2);
 
-        // Bottom-right shadow (1 px)
-        ctx.fillStyle = '#0c1438';
-        ctx.fillRect(x,     y + cs - 1, cs, 1);
-        ctx.fillRect(x + cs - 1, y,     1, cs);
+        // Bottom shadow
+        ctx.fillStyle = '#080e28';
+        ctx.fillRect(x, y + cs - 1, cs, 1);
+        // Right shadow
+        ctx.fillStyle = '#0a1030';
+        ctx.fillRect(x + cs - 1, y, 1, cs);
 
-        // Horizontal mortar line offset per column for brick illusion
-        const mortarY = y + (c % 2 === 0 ? Math.floor(cs / 2) : Math.floor(cs / 3));
-        ctx.fillStyle = '#111a50';
+        // Staggered brick mortar lines
+        const mortarY = y + (r % 2 === 0 ? Math.floor(cs * 0.45) : Math.floor(cs * 0.55));
+        ctx.fillStyle = '#0d1440';
         ctx.fillRect(x + 1, mortarY, cs - 2, 1);
+        // Vertical mortar (offset per row for staggered bricks)
+        const mortarX = x + (r % 2 === 0 ? Math.floor(cs * 0.5) : Math.floor(cs * 0.25));
+        ctx.fillRect(mortarX, y + 1, 1, mortarY - y - 1);
       }
     }
 
     // Grid overlay (edit mode or option)
     if (this.showGrid || mode === 'edit') {
-      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
       for (let c = 0; c <= maze.cols; c++) ctx.fillRect(c * cs, 0, 1, CONFIG.CANVAS_H);
       for (let r = 0; r <= maze.rows; r++) ctx.fillRect(0, r * cs, CONFIG.CANVAS_W, 1);
     }
@@ -161,23 +180,32 @@ class Renderer {
     const cx = Math.round(agent.x);
     const cy = Math.round(agent.y);
 
-    // 1-pixel dark drop shadow (offset 1 sprite-pixel = scale screen pixels)
-    drawSpriteShadow(this.ctx, frame, cx + scale, cy + scale, scale, flip, '#000010', 0.45);
+    // Drop shadow offset by 1 sprite-pixel
+    drawSpriteShadow(this.ctx, frame, cx + scale, cy + scale, scale, flip, '#00000e', 0.5);
 
     // Character sprite
     drawSprite(this.ctx, frame, pal, cx, cy, scale, flip);
 
-    // Carried-wall indicator: small brick floating above the head
+    // Carried-wall indicator: mini block hovering in front of the agent
     if (agent.carryingWall) {
-      const spriteH = scale * 10;
-      const bw = scale * 4, bh = scale * 3;
-      const bx = cx - Math.floor(bw / 2);
-      const by = cy - Math.floor(spriteH / 2) - bh - scale;
-      this.ctx.fillStyle = '#1a2460';
+      const front  = agent.facingLeft ? -1 : 1;
+      const bw     = scale * 4, bh = scale * 4;
+      const bx     = cx + front * (scale * 5 + 1) - Math.floor(bw / 2);
+      const by     = cy - Math.floor(bh / 2);
+      this.ctx.fillStyle = '#182058';
       this.ctx.fillRect(bx, by, bw, bh);
-      this.ctx.fillStyle = '#3050a8';
+      // Highlights
+      this.ctx.fillStyle = '#2c4090';
       this.ctx.fillRect(bx, by, bw, 1);
+      this.ctx.fillStyle = '#1e2e78';
       this.ctx.fillRect(bx, by, 1, bh);
+      // Shadows
+      this.ctx.fillStyle = '#080e28';
+      this.ctx.fillRect(bx, by + bh - 1, bw, 1);
+      this.ctx.fillRect(bx + bw - 1, by, 1, bh);
+      // Mortar crack
+      this.ctx.fillStyle = '#0d1440';
+      this.ctx.fillRect(bx + 1, by + Math.floor(bh / 2), bw - 2, 1);
     }
   }
 
