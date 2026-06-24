@@ -186,3 +186,60 @@ button.dim-btn:hover { color: var(--text); }
   flex-shrink: 0;
   opacity: 0.7;
 }
+
+/* ── Reset confirmation modal ─────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 4, 14, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal-overlay[hidden] { display: none; }
+
+.modal-box {
+  width: 280px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-top: 2px solid #2a40a0;
+  padding: 18px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #c0c8f0;
+  text-transform: uppercase;
+}
+
+.modal-body {
+  font-size: 10px;
+  color: var(--text);
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+button.modal-danger {
+  background: #2a0a0a;
+  border-color: #602020;
+  color: #e08080;
+}
+button.modal-danger:hover {
+  background: #3a1010;
+  border-color: #a03030;
+  color: #f0a0a0;
+}

@@ -26,7 +26,12 @@ class UI {
 
   _bindControls() {
     this._on('btn-play-pause', 'click', () => this._togglePlayPause());
-    this._on('btn-reset', 'click', () => { this.sim.reset(); this._setMode('play'); });
+    this._on('btn-reset',   'click', () => this._showResetModal());
+    this._on('modal-cancel',  'click', () => this._hideResetModal());
+    this._on('modal-confirm', 'click', () => { this._hideResetModal(); this.sim.reset(); this._setMode('play'); });
+    document.getElementById('modal-reset').addEventListener('click', e => {
+      if (e.target === e.currentTarget) this._hideResetModal();
+    });
     this._on('btn-edit', 'click', () => this._toggleEdit());
     this._on('btn-speed', 'click', () => this._cycleSpeed());
 
@@ -155,6 +160,21 @@ class UI {
       : this.maze.isWall(col, row);
     ctx.fillStyle = wouldErase ? 'rgba(255,80,80,0.35)' : 'rgba(100,140,255,0.35)';
     ctx.fillRect(col * cs, row * cs, cs, cs);
+  }
+
+  // ── Reset modal ───────────────────────────────────────────────────────────
+
+  _showResetModal() {
+    const wasPaused = this.mode === 'pause';
+    if (!wasPaused) this._setMode('pause');
+    this._modalWasPaused = wasPaused;
+    document.getElementById('modal-reset').hidden = false;
+    document.getElementById('modal-confirm').focus();
+  }
+
+  _hideResetModal() {
+    document.getElementById('modal-reset').hidden = true;
+    if (!this._modalWasPaused) this._setMode('play');
   }
 
   // ── Mode & tool helpers ───────────────────────────────────────────────────
