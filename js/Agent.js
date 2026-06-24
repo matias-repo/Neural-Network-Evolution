@@ -78,13 +78,29 @@ class Agent {
     // Track facing direction for sprite flip
     if (Math.abs(this.vx) > 0.15) this.facingLeft = this.vx < 0;
 
-    // Axis-separated collision resolution
-    const R = CONFIG.AGENT_RADIUS;
+    // Axis-separated collision: try to push the wall before bouncing
+    const R  = CONFIG.AGENT_RADIUS;
+    const cs = maze.cellSize;
+
     this.x += this.vx;
-    if (maze.isBlocked(this.x, this.y, R)) { this.x -= this.vx; this.vx *= -0.3; }
+    if (maze.isBlocked(this.x, this.y, R)) {
+      const sx  = Math.sign(this.vx);
+      const col = Math.floor((this.x + sx * R) / cs);
+      const row = Math.floor(this.y / cs);
+      if (!maze.tryPushWall(col, row, col + sx, row) || maze.isBlocked(this.x, this.y, R)) {
+        this.x -= this.vx; this.vx *= -0.3;
+      }
+    }
 
     this.y += this.vy;
-    if (maze.isBlocked(this.x, this.y, R)) { this.y -= this.vy; this.vy *= -0.3; }
+    if (maze.isBlocked(this.x, this.y, R)) {
+      const sy  = Math.sign(this.vy);
+      const col = Math.floor(this.x / cs);
+      const row = Math.floor((this.y + sy * R) / cs);
+      if (!maze.tryPushWall(col, row, col, row + sy) || maze.isBlocked(this.x, this.y, R)) {
+        this.y -= this.vy; this.vy *= -0.3;
+      }
+    }
   }
 
   get speed() {

@@ -82,6 +82,16 @@ class Maze {
     return { x: cs * 2 + cs / 2, y: cs * 2 + cs / 2 };
   }
 
+  // Attempt to slide the wall at (col,row) one step to (toCol,toRow).
+  // Returns true if the move happened, false if blocked or not a wall.
+  tryPushWall(col, row, toCol, toRow) {
+    if (!this.grid[row]?.[col]) return false;
+    if (this.isWall(toCol, toRow)) return false;
+    this.setCell(col, row, 0);       // setCell already guards the border
+    this.setCell(toCol, toRow, 1);
+    return true;
+  }
+
   clear() {
     for (let r = 1; r < this.rows - 1; r++)
       for (let c = 1; c < this.cols - 1; c++)
