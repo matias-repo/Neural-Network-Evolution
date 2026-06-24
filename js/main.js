@@ -1,4 +1,19 @@
+function computeLayout() {
+  const cs      = CONFIG.CELL_SIZE;
+  const headerH = 46; // top-bar height (buttons + padding + border)
+  const cols = Math.max(12, Math.min(28, Math.floor(window.innerWidth  / cs)));
+  const rows = Math.max(20, Math.min(42, Math.floor((window.innerHeight - headerH) / cs)));
+  CONFIG.COLS     = cols;
+  CONFIG.ROWS     = rows;
+  CONFIG.CANVAS_W = cols * cs;
+  CONFIG.CANVAS_H = rows * cs;
+  // Propagate computed width to CSS so top-bar / edit-bar / canvas-wrap all match
+  document.documentElement.style.setProperty('--w', `${CONFIG.CANVAS_W}px`);
+}
+
 function init() {
+  computeLayout();
+
   const canvas = document.getElementById('gameCanvas');
   canvas.width  = CONFIG.CANVAS_W;
   canvas.height = CONFIG.CANVAS_H;
@@ -33,12 +48,22 @@ function init() {
 
   const ui = new UI(localMaze, worker, renderer);
 
-  // Send any saved state to the worker
+  // Send layout config + any saved state to the worker so it creates the
+  // Maze and Simulation at the correct screen-specific dimensions.
   const simState = (() => {
     try { return JSON.parse(localStorage.getItem('nn-evo-state')); } catch (_) { return null; }
   })();
   const mazeState = localStorage.getItem('nn-evo-maze');
-  worker.postMessage({ type: 'restore', simState, mazeState });
+  worker.postMessage({
+    type: 'restore',
+    config: {
+      COLS: CONFIG.COLS, ROWS: CONFIG.ROWS,
+      CANVAS_W: CONFIG.CANVAS_W, CANVAS_H: CONFIG.CANVAS_H,
+      CELL_SIZE: CONFIG.CELL_SIZE,
+    },
+    simState,
+    mazeState,
+  });
   worker.postMessage({ type: 'setSpeed', steps: ui.SPEEDS[ui.speedIndex] });
 
   function loop() {

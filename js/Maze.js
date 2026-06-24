@@ -168,17 +168,23 @@ class Maze {
   }
 
   _presetSpiral() {
-    // Ring: central rectangle with a doorway on each side.
-    // Fits the narrow 18-col grid where concentric spirals don't fit.
-    this._wall(8,  5, 8,  12);   // top edge
-    this._wall(21, 5, 21, 12);   // bottom edge
-    this._wall(8,  5, 21,  5);   // left edge
-    this._wall(8, 12, 21, 12);   // right edge
-    // 3-cell doorway centred on each side
-    this._gap(8,  8, 3, true);   // top open: cols 8-10
-    this._gap(21, 8, 3, true);   // bottom open: cols 8-10
-    this._gap(13, 5, 3, false);  // left open: rows 13-15
-    this._gap(13,12, 3, false);  // right open: rows 13-15
+    // Central ring sized to fill the middle ~45% of the grid on each axis.
+    // All coordinates are derived from grid dimensions so this works at any size.
+    const { cols: C, rows: R } = this;
+    const t = Math.round(R * 0.27), b = Math.round(R * 0.72);
+    const l = Math.round(C * 0.28), r = Math.round(C * 0.72);
+    if (b - t < 6 || r - l < 4) return; // grid too small
+    this._wall(t, l, t, r); // top edge
+    this._wall(b, l, b, r); // bottom edge
+    this._wall(t, l, b, l); // left edge
+    this._wall(t, r, b, r); // right edge
+    // 3-cell doorways centred on each side
+    const midC = Math.round((l + r) / 2);
+    const midR = Math.round((t + b) / 2);
+    this._gap(t, midC - 1, 3, true);   // top door
+    this._gap(b, midC - 1, 3, true);   // bottom door
+    this._gap(midR - 1, l, 3, false);  // left door
+    this._gap(midR - 1, r, 3, false);  // right door
   }
 
   _presetZigzag() {

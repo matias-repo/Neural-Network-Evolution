@@ -122,9 +122,9 @@ class Agent {
 
     const R = CONFIG.AGENT_RADIUS;
     this.x += this.vx;
-    if (maze.isBlocked(this.x, this.y, R)) { this.x -= this.vx; this.vx *= -0.3; }
+    if (maze.isBlocked(this.x, this.y, R)) { this.x -= this.vx; this.vx = 0; }
     this.y += this.vy;
-    if (maze.isBlocked(this.x, this.y, R)) { this.y -= this.vy; this.vy *= -0.3; }
+    if (maze.isBlocked(this.x, this.y, R)) { this.y -= this.vy; this.vy = 0; }
 
     if (this._wallCooldown > 0) {
       this._wallCooldown--;
