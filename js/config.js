@@ -27,10 +27,12 @@ const CONFIG = {
   ELITE_COUNT: 2,
 
   // Neural-network layer sizes
-  // inputs 0-12: 8 wall rays + opponent dx/dy/dist + own vx/vy
-  // input  13:   carryingWall (0 or 1)
+  // inputs 0-7:   8 wall rays (wall sensing / block navigation)
+  // inputs 8-11:  own x/y + opponent x/y (all normalized 0-1, always exact)
+  // inputs 12-15: own vx/vy + opponent vx/vy (normalized, for movement prediction)
+  // input  16:    carryingWall (0 or 1)
   // outputs 0-1: ax, ay   output 2: interact (tanh > 0.5 = pickup or place)
-  NN_LAYERS: [14, 20, 12, 3],
+  NN_LAYERS: [17, 24, 14, 3],
 
   // Wall interaction
   WALL_INTERACT_COOLDOWN: 20,   // sim-frames between pickups / placements

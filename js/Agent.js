@@ -34,13 +34,17 @@ class Agent {
     this.wallInteractions = 0;
   }
 
-  // ── Sensors → 13 inputs ──────────────────────────────────────────────────
+  // ── Sensors → 17 inputs ──────────────────────────────────────────────────
   //  [0..7]  wall ray distances (1 = clear, 0 = wall right here)
-  //  [8]     relative x to opponent (clamped to [-1,1])
-  //  [9]     relative y to opponent (clamped to [-1,1])
-  //  [10]    distance to opponent normalised
-  //  [11]    own vx / MAX_SPEED
-  //  [12]    own vy / MAX_SPEED
+  //  [8]     own x / CANVAS_W
+  //  [9]     own y / CANVAS_H
+  //  [10]    opponent x / CANVAS_W
+  //  [11]    opponent y / CANVAS_H
+  //  [12]    own vx / MAX_SPEED
+  //  [13]    own vy / MAX_SPEED
+  //  [14]    opponent vx / MAX_SPEED  (lets agents predict movement)
+  //  [15]    opponent vy / MAX_SPEED
+  //  [16]    carryingWall (0 or 1)
   sense(maze, opponent) {
     const rc = CONFIG.RAY_COUNT;
     const inputs = [];
@@ -52,16 +56,14 @@ class Agent {
       inputs.push(d);
     }
 
-    const MAX_DIST = Math.hypot(CONFIG.CANVAS_W, CONFIG.CANVAS_H);
-    const dx = (opponent.x - this.x) / MAX_DIST;
-    const dy = (opponent.y - this.y) / MAX_DIST;
-    const dist = Math.hypot(dx, dy); // already normalised
-
-    inputs.push(Math.max(-1, Math.min(1, dx * 4)));  // amplify for sensitivity
-    inputs.push(Math.max(-1, Math.min(1, dy * 4)));
-    inputs.push(Math.min(1, dist * 4));
+    inputs.push(this.x / CONFIG.CANVAS_W);
+    inputs.push(this.y / CONFIG.CANVAS_H);
+    inputs.push(opponent.x / CONFIG.CANVAS_W);
+    inputs.push(opponent.y / CONFIG.CANVAS_H);
     inputs.push(this.vx / CONFIG.MAX_SPEED);
     inputs.push(this.vy / CONFIG.MAX_SPEED);
+    inputs.push(opponent.vx / CONFIG.MAX_SPEED);
+    inputs.push(opponent.vy / CONFIG.MAX_SPEED);
     inputs.push(this.carryingWall ? 1 : 0);
 
     this.lastInputs = inputs;
