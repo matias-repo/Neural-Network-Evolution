@@ -22,13 +22,14 @@ function init() {
 
 function loop() {
   requestAnimationFrame(loop);
-
-  if (ui.mode === 'play') {
-    sim.update(ui.stepsPerFrame);
-    ui.updateStats();
+  try {
+    if (ui.mode === 'play') {
+      sim.update(ui.stepsPerFrame);
+    }
+    renderer.render(maze, sim, ui.mode);
+  } catch (err) {
+    console.error('Game loop error:', err);
   }
-
-  renderer.render(maze, sim, ui.mode);
 }
 
 window.addEventListener('load', init);

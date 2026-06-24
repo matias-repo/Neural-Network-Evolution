@@ -32,7 +32,7 @@ class UI {
 
     this._on('tool-draw', 'click', () => this._setTool('draw'));
     this._on('tool-erase', 'click', () => this._setTool('erase'));
-    this._on('btn-clear', 'click', () => { this.maze.clear(); this.sim.onMazeChanged(); });
+    this._on('btn-clear', 'click', () => { this.maze.clear(); });
 
     this._on('chk-grid', 'change', e => { this.renderer.showGrid = e.target.checked; });
 
@@ -42,14 +42,13 @@ class UI {
     });
     this._on('btn-load-maze', 'click', () => {
       const str = localStorage.getItem('nn-evo-maze');
-      if (str) { this.maze.deserialize(str); this.sim.onMazeChanged(); }
+      if (str) { this.maze.deserialize(str); }
     });
 
     // Preset buttons
     document.querySelectorAll('[data-preset]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.maze.loadPreset(btn.dataset.preset);
-        this.sim.onMazeChanged();
       });
     });
   }
@@ -136,7 +135,6 @@ class UI {
     this._lastCell = key;
 
     this.maze.setCell(col, row, this.editTool === 'draw' ? 1 : 0);
-    this.sim.onMazeChanged();
   }
 
   _drawHoverHighlight(mx, my) {
@@ -154,14 +152,19 @@ class UI {
   // ── Mode & tool helpers ───────────────────────────────────────────────────
 
   _togglePlayPause() {
-    if (this.mode === 'edit') return;
+    if (this.mode === 'edit') { this._exitEdit(); return; }
     if (this.mode === 'play') { this._setMode('pause'); }
     else { this._setMode('play'); }
   }
 
   _toggleEdit() {
-    if (this.mode === 'edit') { this._setMode('play'); }
+    if (this.mode === 'edit') { this._exitEdit(); }
     else { this._setMode('edit'); }
+  }
+
+  _exitEdit() {
+    this.sim.onMazeChanged();
+    this._setMode('play');
   }
 
   _setMode(m) {
