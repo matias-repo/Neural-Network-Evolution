@@ -13,15 +13,15 @@ const CONFIG = {
   // Sensors
   RAY_COUNT: 8,
   RAY_MAX_DIST: 150,
-  RAY_STEP: 3,
+  RAY_STEP: 6,           // coarser but 2× faster ray marching
 
   // Episode
-  EPISODE_FRAMES: 900,
+  EPISODE_FRAMES: 500,   // fewer frames → faster generations
   MIN_START_DIST: 150,   // scaled for narrower canvas
   CATCH_DIST: 14,
 
   // Evolution
-  POP_SIZE: 30,
+  POP_SIZE: 20,          // fewer episodes per gen → faster evolution cycles
   MUTATION_RATE: 0.12,
   MUTATION_STRENGTH: 0.25,
   ELITE_COUNT: 2,

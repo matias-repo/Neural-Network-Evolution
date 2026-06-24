@@ -6,7 +6,7 @@ class UI {
 
     this.mode = 'play';        // 'play' | 'edit' | 'pause'
     this.speedIndex = 0;       // index into SPEEDS
-    this.SPEEDS = [1, 5, 20, 100, 500, 2000, 5000, 10000];
+    this.SPEEDS = [1, 5, 20, 100, 500, 2000, 10000, 50000];
     this._dragAction = null;   // 'draw' | 'erase', determined on each mousedown
 
     this._mouseDown = false;
