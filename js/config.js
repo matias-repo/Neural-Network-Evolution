@@ -1,4 +1,4 @@
-const VERSION = '0.6';
+const VERSION = '0.7';
 
 const CONFIG = {
   // Grid – portrait 18×30 at 20 px = 360×600
@@ -25,10 +25,10 @@ const CONFIG = {
   CATCH_DIST: 20,
 
   // Evolution
-  POP_SIZE: 30,          // more diversity; was 20 (too small for the weight space)
+  POP_SIZE: 100,         // larger pop = better weight-space coverage per generation
   MUTATION_RATE: 0.12,
   MUTATION_STRENGTH: 0.25,
-  ELITE_COUNT: 3,
+  ELITE_COUNT: 5,        // ~5% elitism (was 10% at pop 30) — more room for diversity
 
   // Neural-network layer sizes — predator and prey have different input counts
   // Predator (23 inputs): rays[0-7], own x/y, prey1 x/y, prey2 x/y,
