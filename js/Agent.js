@@ -143,9 +143,15 @@ class Agent {
         }
       } else {
         if (maze.tryPlaceWall(col, row)) {
-          this.carryingWall    = false;
-          this._wallCooldown   = CONFIG.WALL_INTERACT_COOLDOWN;
-          this.wallInteractions++;
+          if (maze.isBlocked(this.x, this.y, R)) {
+            // Revert: wall would overlap agent's own body
+            maze.grid[row][col] = 0;
+            maze.dirty = true;
+          } else {
+            this.carryingWall  = false;
+            this._wallCooldown = CONFIG.WALL_INTERACT_COOLDOWN;
+            this.wallInteractions++;
+          }
         }
       }
     }
