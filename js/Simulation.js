@@ -64,13 +64,7 @@ class Simulation {
     this.frame = 0;
     this.caught = false;
 
-    // Ep 0 locks in the maze for the whole generation; later eps restore it
-    // so every agent is tested against the same wall layout.
-    if (idx === 0) {
-      this._snapshotMaze();
-    } else {
-      this._restoreMaze();
-    }
+    this._restoreMaze();  // every episode starts from the user-defined baseline
 
     const predPos = this.maze.randomOpenPos(null, 0);
     const preyPos = this.maze.randomOpenPos(predPos, CONFIG.MIN_START_DIST);
@@ -192,10 +186,10 @@ class Simulation {
     }
   }
 
-  // Call when the maze is externally edited so the new layout becomes the baseline
+  // Call when the maze is externally changed — locks in the new layout as the baseline
   onMazeChanged() {
-    this._snapshotMaze();
-    this._startEpisode(this.episode);
+    this._snapshotMaze();         // user's new layout becomes the fixed baseline
+    this._startEpisode(this.episode);  // _startEpisode restores from that baseline
   }
 
   get episodeProgress() {

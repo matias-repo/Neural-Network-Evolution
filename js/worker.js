@@ -24,6 +24,7 @@ self.onmessage = ({ data: msg }) => {
       if (msg.mazeState) {
         try { maze.deserialize(msg.mazeState); } catch (_) {}
       }
+      sim._snapshotMaze();         // lock in this maze as the permanent baseline
       if (msg.simState) sim.tryRestore(msg.simState);
       paused = false;
       flush(true);
