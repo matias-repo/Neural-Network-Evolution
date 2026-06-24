@@ -34,7 +34,6 @@ class UI {
     this._on('tool-erase', 'click', () => this._setTool('erase'));
     this._on('btn-clear', 'click', () => { this.maze.clear(); this.sim.onMazeChanged(); });
 
-    this._on('chk-rays', 'change', e => { this.renderer.showRays = e.target.checked; });
     this._on('chk-grid', 'change', e => { this.renderer.showGrid = e.target.checked; });
 
     this._on('btn-save-maze', 'click', () => {

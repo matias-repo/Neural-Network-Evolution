@@ -8,10 +8,13 @@ class Agent {
     this.vy = 0;
     this.fitness = 0;
 
-    // Cached sensor data for rendering
+    // Cached sensor data (rays still used for NN inputs, not rendered)
     this.rays = new Array(CONFIG.RAY_COUNT).fill(1);
     this.lastInputs = [];
     this.lastOutputs = [0, 0];
+
+    // Sprite state
+    this.facingLeft = false;
   }
 
   reset(x, y) {
@@ -72,6 +75,9 @@ class Agent {
       this.vy = (this.vy / spd) * CONFIG.MAX_SPEED;
     }
 
+    // Track facing direction for sprite flip
+    if (Math.abs(this.vx) > 0.15) this.facingLeft = this.vx < 0;
+
     // Axis-separated collision resolution
     const R = CONFIG.AGENT_RADIUS;
     this.x += this.vx;
@@ -81,7 +87,7 @@ class Agent {
     if (maze.isBlocked(this.x, this.y, R)) { this.y -= this.vy; this.vy *= -0.3; }
   }
 
-  get heading() {
-    return Math.atan2(this.vy, this.vx);
+  get speed() {
+    return Math.sqrt(this.vx * this.vx + this.vy * this.vy);
   }
 }

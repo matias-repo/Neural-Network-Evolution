@@ -206,8 +206,8 @@ button.danger:hover { background: #3a0f0f; }
   flex-shrink: 0;
 }
 
-.dot.pred { background: var(--accent-pred); box-shadow: 0 0 6px var(--accent-pred); }
-.dot.prey { background: var(--accent-prey); box-shadow: 0 0 6px var(--accent-prey); }
+.dot.pred { background: #c83c18; box-shadow: 0 0 6px #c83c18; }
+.dot.prey { background: #b8bcf0; box-shadow: 0 0 6px #b8bcf0; }
 
 /* ── Checkbox row ────────────────────────────────────────────────────────── */
 

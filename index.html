@@ -38,10 +38,6 @@
         <button id="btn-reset" class="danger">↺ Reset</button>
       </div>
       <div class="chk-row">
-        <input type="checkbox" id="chk-rays" checked />
-        <label for="chk-rays">Show sensor rays</label>
-      </div>
-      <div class="chk-row">
         <input type="checkbox" id="chk-grid" />
         <label for="chk-grid">Show grid</label>
       </div>
@@ -51,8 +47,12 @@
     <div class="panel">
       <div class="panel-title">Agents</div>
       <div class="legend">
-        <div class="legend-item"><div class="dot pred"></div> Predator – catches prey</div>
-        <div class="legend-item"><div class="dot prey"></div> Prey – survives</div>
+        <div class="legend-item"><div class="dot pred"></div> Fox – catches rabbit</div>
+        <div class="legend-item"><div class="dot prey"></div> Rabbit – survives</div>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-dim);">
+        Rabbit ears flatten &amp; eyes widen when fox is near.<br>
+        Fox breaks into a sprint when close to prey.
       </div>
     </div>
 
@@ -132,6 +132,7 @@
 
 <!-- Scripts – order matters -->
 <script src="js/config.js"></script>
+<script src="js/Sprites.js"></script>
 <script src="js/NeuralNetwork.js"></script>
 <script src="js/GeneticAlgorithm.js"></script>
 <script src="js/Maze.js"></script>

@@ -2,153 +2,142 @@ class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.showRays = true;
+    this.ctx.imageSmoothingEnabled = false;  // keep pixels crisp
     this.showGrid = false;
+
+    // Pixels per sprite pixel.  Prey = 2 (20×20), Predator = 3 (30×30).
+    this.PREY_SCALE  = 2;
+    this.PRED_SCALE  = 3;
+
+    // Distance thresholds for animation state switches
+    this.FEAR_DIST  = 160;  // prey shows fear below this
+    this.CHASE_DIST = 200;  // predator shows chase below this
+
+    // Animation speed (game frames per sprite frame)
+    this.WALK_DUR  = 10;
+    this.FEAR_DUR  = 4;
+    this.CHASE_DUR = 4;
   }
 
   render(maze, sim, mode) {
-    const ctx = this.ctx;
-    ctx.clearRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
-
+    this.ctx.imageSmoothingEnabled = false;
     this._drawMaze(maze, mode);
-    if (mode === 'play' || mode === 'pause') {
-      this._drawAgentRays(sim.prey, '#00ff88');
-      this._drawAgentRays(sim.predator, '#ff4444');
-      this._drawAgent(sim.prey, '#00ff88', '#00cc66');
-      this._drawAgent(sim.predator, '#ff4444', '#cc2222');
-      this._drawCatchRadius(sim);
-    }
-    if (mode === 'edit') {
-      this._drawEditCursor(maze);
+
+    if (mode !== 'edit') {
+      const dist = sim.predator && sim.prey
+        ? Math.hypot(sim.predator.x - sim.prey.x, sim.predator.y - sim.prey.y)
+        : Infinity;
+
+      // Prey drawn first so predator appears on top
+      this._drawCharacter(sim.prey,     dist, sim.totalFrames);
+      this._drawCharacter(sim.predator, dist, sim.totalFrames);
     }
   }
+
+  // ── Maze ──────────────────────────────────────────────────────────────────
 
   _drawMaze(maze, mode) {
     const ctx = this.ctx;
-    const cs = maze.cellSize;
+    const cs  = maze.cellSize;
 
-    // Background
-    ctx.fillStyle = '#0d0d1a';
-    ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
-
-    // Walls
+    // Floor – subtle two-tone checkerboard at cell level
     for (let r = 0; r < maze.rows; r++) {
       for (let c = 0; c < maze.cols; c++) {
-        if (maze.grid[r][c]) {
-          const x = c * cs, y = r * cs;
-          // Wall base
-          ctx.fillStyle = '#1e2a5e';
-          ctx.fillRect(x, y, cs, cs);
-          // Wall top highlight
-          ctx.fillStyle = '#2d3f8a';
-          ctx.fillRect(x, y, cs, 2);
-          ctx.fillStyle = '#162050';
-          ctx.fillRect(x, y + cs - 2, cs, 2);
-        }
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#0d0d1a' : '#0f101e';
+        ctx.fillRect(c * cs, r * cs, cs, cs);
       }
     }
 
-    // Grid lines (optional, always shown in edit mode)
+    // Walls with pixel-art brick shading
+    for (let r = 0; r < maze.rows; r++) {
+      for (let c = 0; c < maze.cols; c++) {
+        if (!maze.grid[r][c]) continue;
+        const x = c * cs, y = r * cs;
+
+        // Base wall
+        ctx.fillStyle = '#1a2460';
+        ctx.fillRect(x, y, cs, cs);
+
+        // Top-left bevel highlight (1 px)
+        ctx.fillStyle = '#3050a8';
+        ctx.fillRect(x,     y,     cs, 1);
+        ctx.fillStyle = '#243490';
+        ctx.fillRect(x,     y + 1, 1, cs - 1);
+
+        // Bottom-right shadow (1 px)
+        ctx.fillStyle = '#0c1438';
+        ctx.fillRect(x,     y + cs - 1, cs, 1);
+        ctx.fillRect(x + cs - 1, y,     1, cs);
+
+        // Horizontal mortar line offset per column for brick illusion
+        const mortarY = y + (c % 2 === 0 ? Math.floor(cs / 2) : Math.floor(cs / 3));
+        ctx.fillStyle = '#111a50';
+        ctx.fillRect(x + 1, mortarY, cs - 2, 1);
+      }
+    }
+
+    // Grid overlay (edit mode or option)
     if (this.showGrid || mode === 'edit') {
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-      ctx.lineWidth = 0.5;
-      for (let c = 0; c <= maze.cols; c++) {
-        ctx.beginPath(); ctx.moveTo(c * cs, 0); ctx.lineTo(c * cs, CONFIG.CANVAS_H); ctx.stroke();
-      }
-      for (let r = 0; r <= maze.rows; r++) {
-        ctx.beginPath(); ctx.moveTo(0, r * cs); ctx.lineTo(CONFIG.CANVAS_W, r * cs); ctx.stroke();
-      }
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      for (let c = 0; c <= maze.cols; c++) ctx.fillRect(c * cs, 0, 1, CONFIG.CANVAS_H);
+      for (let r = 0; r <= maze.rows; r++) ctx.fillRect(0, r * cs, CONFIG.CANVAS_W, 1);
     }
   }
 
-  _drawAgentRays(agent, color) {
-    if (!this.showRays || !agent) return;
-    const ctx = this.ctx;
-    const rc = CONFIG.RAY_COUNT;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = color;
-    for (let i = 0; i < rc; i++) {
-      const angle = (i / rc) * Math.PI * 2;
-      const d = agent.rays[i] * CONFIG.RAY_MAX_DIST;
-      // Rays near a wall appear brighter
-      ctx.globalAlpha = 0.10 + (1 - agent.rays[i]) * 0.35;
-      ctx.beginPath();
-      ctx.moveTo(agent.x, agent.y);
-      ctx.lineTo(agent.x + Math.cos(angle) * d, agent.y + Math.sin(angle) * d);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
+  // ── Characters ────────────────────────────────────────────────────────────
 
-  _drawAgent(agent, fillColor, strokeColor) {
+  _drawCharacter(agent, distToOpponent, totalFrames) {
     if (!agent) return;
-    const ctx = this.ctx;
-    const R = CONFIG.AGENT_RADIUS;
+    const isPrey = agent.type === 'prey';
 
-    // Shadow / glow
-    ctx.shadowColor = fillColor;
-    ctx.shadowBlur = 12;
+    // Pick animation set and timing
+    let frames, pal, dur;
+    if (isPrey) {
+      const scared = distToOpponent < this.FEAR_DIST;
+      frames = scared ? SPRITES.prey.fear  : SPRITES.prey.walk;
+      pal    = SPRITES.prey.pal;
+      dur    = scared ? this.FEAR_DUR : this.WALK_DUR;
+    } else {
+      const chasing = distToOpponent < this.CHASE_DIST;
+      frames = chasing ? SPRITES.predator.chase : SPRITES.predator.walk;
+      pal    = SPRITES.predator.pal;
+      dur    = chasing ? this.CHASE_DUR : this.WALK_DUR;
+    }
 
-    // Body
-    ctx.beginPath();
-    ctx.arc(agent.x, agent.y, R, 0, Math.PI * 2);
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    // Slow animation down when barely moving
+    const movingFast = agent.speed > CONFIG.MAX_SPEED * 0.25;
+    const effectiveDur = movingFast ? dur : dur * 3;
 
-    // Outline
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    const frameIdx = Math.floor(totalFrames / effectiveDur) % frames.length;
+    const frame    = frames[frameIdx];
+    const scale    = isPrey ? this.PREY_SCALE : this.PRED_SCALE;
+    const flip     = agent.facingLeft;
 
-    // Direction indicator
-    const heading = agent.heading;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.globalAlpha = 0.7;
-    ctx.beginPath();
-    ctx.moveTo(agent.x, agent.y);
-    ctx.lineTo(agent.x + Math.cos(heading) * R * 1.4, agent.y + Math.sin(heading) * R * 1.4);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
+    const cx = Math.round(agent.x);
+    const cy = Math.round(agent.y);
 
-  _drawCatchRadius(sim) {
-    if (!sim.predator || !sim.prey) return;
-    const dist = Math.hypot(sim.predator.x - sim.prey.x, sim.predator.y - sim.prey.y);
-    const closeRatio = Math.max(0, 1 - dist / (CONFIG.CATCH_DIST * 6));
-    if (closeRatio < 0.05) return;
+    // 1-pixel dark drop shadow (offset 1 sprite-pixel = scale screen pixels)
+    drawSpriteShadow(this.ctx, frame, cx + scale, cy + scale, scale, flip, '#000010', 0.45);
 
-    const ctx = this.ctx;
-    ctx.globalAlpha = closeRatio * 0.3;
-    ctx.strokeStyle = '#ff8800';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.arc(sim.predator.x, sim.predator.y, CONFIG.CATCH_DIST, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-  }
-
-  _drawEditCursor(maze) {
-    // Cursor highlight is drawn by UI on mousemove; this just ensures grid is visible
+    // Character sprite
+    drawSprite(this.ctx, frame, pal, cx, cy, scale, flip);
   }
 
   // ── Fitness chart ─────────────────────────────────────────────────────────
+
   drawChart(canvas, history) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
-
-    ctx.fillStyle = '#0a0a18';
+    ctx.fillStyle = '#08081a';
     ctx.fillRect(0, 0, W, H);
 
     if (history.length < 2) {
       ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.font = '11px monospace';
-      ctx.fillText('Waiting for data…', 8, H / 2);
+      ctx.font = '10px monospace';
+      ctx.fillText('Waiting for data…', 6, H / 2 + 4);
       return;
     }
 
@@ -157,36 +146,34 @@ class Renderer {
       ...history.map(h => Math.max(h.predBest, h.preyBest))
     );
     const pad = { t: 4, b: 14, l: 4, r: 4 };
-    const chartW = W - pad.l - pad.r;
-    const chartH = H - pad.t - pad.b;
+    const cW = W - pad.l - pad.r;
+    const cH = H - pad.t - pad.b;
+    const toX = i => pad.l + (i / (history.length - 1)) * cW;
+    const toY = v => pad.t + cH - (v / maxVal) * cH;
 
-    const toX = i => pad.l + (i / (history.length - 1)) * chartW;
-    const toY = v => pad.t + chartH - (v / maxVal) * chartH;
-
-    const drawLine = (key, color) => {
+    const line = (key, color, alpha) => {
       ctx.beginPath();
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth   = 1;
+      ctx.globalAlpha = alpha;
       history.forEach((h, i) => {
-        const x = toX(i), y = toY(h[key]);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        i === 0 ? ctx.moveTo(toX(i), toY(h[key])) : ctx.lineTo(toX(i), toY(h[key]));
       });
       ctx.stroke();
+      ctx.globalAlpha = 1;
     };
 
-    ctx.globalAlpha = 0.4;
-    drawLine('predAvg', '#ff4444');
-    drawLine('preyAvg', '#00ff88');
-    ctx.globalAlpha = 1;
-    drawLine('predBest', '#ff4444');
-    drawLine('preyBest', '#00ff88');
+    line('predAvg',  '#ff4444', 0.35);
+    line('preyAvg',  '#00ff88', 0.35);
+    line('predBest', '#ff4444', 1);
+    line('preyBest', '#00ff88', 1);
 
-    // x-axis label
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = '9px monospace';
+    ctx.fillStyle  = 'rgba(255,255,255,0.25)';
+    ctx.font       = '9px monospace';
+    ctx.textAlign  = 'left';
     ctx.fillText(`Gen ${history[0].gen}`, pad.l, H - 2);
-    ctx.textAlign = 'right';
+    ctx.textAlign  = 'right';
     ctx.fillText(`Gen ${history[history.length - 1].gen}`, W - pad.r, H - 2);
-    ctx.textAlign = 'left';
+    ctx.textAlign  = 'left';
   }
 }
