@@ -4,10 +4,10 @@ class UI {
     this.sim = sim;
     this.renderer = renderer;
 
-    this.mode = 'play';       // 'play' | 'edit' | 'pause'
-    this.editTool = 'draw';   // 'draw' | 'erase'
-    this.speedIndex = 0;      // index into SPEEDS
-    this.SPEEDS = [1, 5, 20, 100, 500, 2000];
+    this.mode = 'play';        // 'play' | 'edit' | 'pause'
+    this.speedIndex = 0;       // index into SPEEDS
+    this.SPEEDS = [1, 5, 20, 100, 500, 2000, 5000, 10000];
+    this._dragAction = null;   // 'draw' | 'erase', determined on each mousedown
 
     this._mouseDown = false;
     this._lastCell = null;
@@ -30,8 +30,6 @@ class UI {
     this._on('btn-edit', 'click', () => this._toggleEdit());
     this._on('btn-speed', 'click', () => this._cycleSpeed());
 
-    this._on('tool-draw', 'click', () => this._setTool('draw'));
-    this._on('tool-erase', 'click', () => this._setTool('erase'));
     this._on('btn-clear', 'click', () => { this.maze.clear(); });
 
     this._on('chk-grid', 'change', e => { this.renderer.showGrid = e.target.checked; });
@@ -60,6 +58,8 @@ class UI {
     canvas.addEventListener('mousedown', e => {
       if (this.mode !== 'edit') return;
       this._mouseDown = true;
+      const { col, row } = this._eventCell(e);
+      this._dragAction = this.maze.isWall(col, row) ? 'erase' : 'draw';
       this._applyTool(e);
     });
 
@@ -67,11 +67,11 @@ class UI {
       this._handleMove(e, canvas);
     });
 
-    canvas.addEventListener('mouseup',    () => { this._mouseDown = false; this._lastCell = null; });
-    canvas.addEventListener('mouseleave', () => { this._mouseDown = false; this._hoverCell = null; this._lastCell = null; });
+    canvas.addEventListener('mouseup',    () => { this._mouseDown = false; this._lastCell = null; this._dragAction = null; });
+    canvas.addEventListener('mouseleave', () => { this._mouseDown = false; this._hoverCell = null; this._lastCell = null; this._dragAction = null; });
 
     canvas.addEventListener('contextmenu', e => {
-      if (this.mode === 'edit') { e.preventDefault(); this._setTool(this.editTool === 'draw' ? 'erase' : 'draw'); }
+      if (this.mode === 'edit') e.preventDefault();
     });
 
     // ── Touch ──────────────────────────────────────────────────────────────
@@ -79,7 +79,10 @@ class UI {
       if (this.mode !== 'edit') return;
       e.preventDefault();
       this._mouseDown = true;
-      this._applyTool(this._touchEvt(e, canvas));
+      const te = this._touchEvt(e, canvas);
+      const { col, row } = this._eventCell(te);
+      this._dragAction = this.maze.isWall(col, row) ? 'erase' : 'draw';
+      this._applyTool(te);
     }, { passive: false });
 
     canvas.addEventListener('touchmove', e => {
@@ -92,6 +95,7 @@ class UI {
       e.preventDefault();
       this._mouseDown = false;
       this._lastCell = null;
+      this._dragAction = null;
     }, { passive: false });
   }
 
@@ -121,20 +125,20 @@ class UI {
     this._drawHoverHighlight(mx, my);
   }
 
-  _applyTool(e) {
+  _eventCell(e) {
     const canvas = document.getElementById('gameCanvas');
     const rect   = canvas.getBoundingClientRect();
-    const scaleX = CONFIG.CANVAS_W / rect.width;
-    const scaleY = CONFIG.CANVAS_H / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top)  * scaleY;
-    const { col, row } = this.maze.getCellAt(mx, my);
+    const mx = (e.clientX - rect.left) * (CONFIG.CANVAS_W / rect.width);
+    const my = (e.clientY - rect.top)  * (CONFIG.CANVAS_H / rect.height);
+    return this.maze.getCellAt(mx, my);
+  }
 
+  _applyTool(e) {
+    const { col, row } = this._eventCell(e);
     const key = `${col},${row}`;
     if (key === this._lastCell) return;
     this._lastCell = key;
-
-    this.maze.setCell(col, row, this.editTool === 'draw' ? 1 : 0);
+    this.maze.setCell(col, row, this._dragAction === 'draw' ? 1 : 0);
   }
 
   _drawHoverHighlight(mx, my) {
@@ -145,7 +149,11 @@ class UI {
     ctx.clearRect(0, 0, overlay.width, overlay.height);
     const cs = this.maze.cellSize;
     const { col, row } = this._hoverCell;
-    ctx.fillStyle = this.editTool === 'draw' ? 'rgba(100,140,255,0.35)' : 'rgba(255,80,80,0.35)';
+    // Preview action: red if hovering a wall (would erase), blue if empty (would draw)
+    const wouldErase = this._dragAction
+      ? this._dragAction === 'erase'
+      : this.maze.isWall(col, row);
+    ctx.fillStyle = wouldErase ? 'rgba(255,80,80,0.35)' : 'rgba(100,140,255,0.35)';
     ctx.fillRect(col * cs, row * cs, cs, cs);
   }
 
@@ -181,14 +189,6 @@ class UI {
     }
 
     this._syncButtons();
-  }
-
-  _setTool(tool) {
-    this.editTool = tool;
-    ['draw', 'erase'].forEach(t => {
-      const el = document.getElementById(`tool-${t}`);
-      if (el) el.classList.toggle('active', t === tool);
-    });
   }
 
   _cycleSpeed() {
