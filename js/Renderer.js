@@ -90,53 +90,19 @@ class Renderer {
     const ctx = this.ctx;
     const cs  = maze.cellSize;
 
-    // Floor – dark stone tiles with faint corner insets for depth
-    for (let r = 0; r < maze.rows; r++) {
-      for (let c = 0; c < maze.cols; c++) {
-        ctx.fillStyle = (r + c) % 2 === 0 ? '#07070e' : '#09091a';
-        ctx.fillRect(c * cs, r * cs, cs, cs);
-        // Subtle 1-px inset shadow on top-left of each tile
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
-        ctx.fillRect(c * cs, r * cs, cs, 1);
-        ctx.fillRect(c * cs, r * cs, 1, cs);
-        // Tiny highlight on bottom-right
-        ctx.fillStyle = 'rgba(255,255,255,0.025)';
-        ctx.fillRect(c * cs + cs - 1, r * cs, 1, cs);
-        ctx.fillRect(c * cs, r * cs + cs - 1, cs, 1);
-      }
-    }
+    // Floor – single solid fill
+    ctx.fillStyle = '#07070f';
+    ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
 
-    // Walls – dark crystal/stone blocks
+    // Walls – flat blocks with a single 1px top edge highlight
     for (let r = 0; r < maze.rows; r++) {
       for (let c = 0; c < maze.cols; c++) {
         if (!maze.grid[r][c]) continue;
         const x = c * cs, y = r * cs;
-
-        // Base
-        ctx.fillStyle = '#182058';
+        ctx.fillStyle = '#1a2260';
         ctx.fillRect(x, y, cs, cs);
-
-        // Top highlight
-        ctx.fillStyle = '#2c4090';
+        ctx.fillStyle = '#2a3880';
         ctx.fillRect(x, y, cs, 1);
-        // Left highlight
-        ctx.fillStyle = '#1e2e78';
-        ctx.fillRect(x, y + 1, 1, cs - 2);
-
-        // Bottom shadow
-        ctx.fillStyle = '#080e28';
-        ctx.fillRect(x, y + cs - 1, cs, 1);
-        // Right shadow
-        ctx.fillStyle = '#0a1030';
-        ctx.fillRect(x + cs - 1, y, 1, cs);
-
-        // Staggered brick mortar lines
-        const mortarY = y + (r % 2 === 0 ? Math.floor(cs * 0.45) : Math.floor(cs * 0.55));
-        ctx.fillStyle = '#0d1440';
-        ctx.fillRect(x + 1, mortarY, cs - 2, 1);
-        // Vertical mortar (offset per row for staggered bricks)
-        const mortarX = x + (r % 2 === 0 ? Math.floor(cs * 0.5) : Math.floor(cs * 0.25));
-        ctx.fillRect(mortarX, y + 1, 1, mortarY - y - 1);
       }
     }
 

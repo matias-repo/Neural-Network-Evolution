@@ -17,8 +17,9 @@ class Agent {
     this.facingLeft = false;
 
     // Wall interaction
-    this.carryingWall   = false;
-    this._wallCooldown  = 0;
+    this.carryingWall    = false;
+    this._wallCooldown   = 0;
+    this.wallInteractions = 0;
   }
 
   reset(x, y) {
@@ -28,8 +29,9 @@ class Agent {
     this.vy = 0;
     this.fitness = 0;
     this.rays = new Array(CONFIG.RAY_COUNT).fill(1);
-    this.carryingWall  = false;
-    this._wallCooldown = 0;
+    this.carryingWall    = false;
+    this._wallCooldown   = 0;
+    this.wallInteractions = 0;
   }
 
   // ── Sensors → 13 inputs ──────────────────────────────────────────────────
@@ -105,13 +107,15 @@ class Agent {
       );
       if (!this.carryingWall) {
         if (maze.tryPickupWall(col, row)) {
-          this.carryingWall  = true;
-          this._wallCooldown = CONFIG.WALL_INTERACT_COOLDOWN;
+          this.carryingWall    = true;
+          this._wallCooldown   = CONFIG.WALL_INTERACT_COOLDOWN;
+          this.wallInteractions++;
         }
       } else {
         if (maze.tryPlaceWall(col, row)) {
-          this.carryingWall  = false;
-          this._wallCooldown = CONFIG.WALL_INTERACT_COOLDOWN;
+          this.carryingWall    = false;
+          this._wallCooldown   = CONFIG.WALL_INTERACT_COOLDOWN;
+          this.wallInteractions++;
         }
       }
     }

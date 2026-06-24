@@ -88,11 +88,15 @@ class Simulation {
     const t = this.frame;
     const maxT = CONFIG.EPISODE_FRAMES;
 
-    // Prey rewarded for surviving longer
-    this.preyFitness[this.episode] = t;
+    const wb = CONFIG.WALL_PICKUP_BONUS;
 
-    // Predator rewarded for catching quickly; zero if it never caught prey
-    this.predFitness[this.episode] = this.caught ? (maxT - t) + maxT * 0.5 : 0;
+    // Prey rewarded for surviving longer + wall interactions
+    this.preyFitness[this.episode] = t + this.prey.wallInteractions * wb;
+
+    // Predator rewarded for catching quickly; always gets wall interaction bonus
+    this.predFitness[this.episode] = this.caught
+      ? (maxT - t) + maxT * 0.5 + this.predator.wallInteractions * wb
+      : this.predator.wallInteractions * wb;
 
     const nextEp = this.episode + 1;
     if (nextEp >= CONFIG.POP_SIZE) {
