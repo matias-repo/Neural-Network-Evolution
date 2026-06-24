@@ -1,4 +1,4 @@
-const CACHE = 'nnevo-v1.0.2';
+const CACHE = 'nnevo-v1.0.3';
 
 const ASSETS = [
   './',
@@ -35,9 +35,19 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Cache-first: serve from cache, fall back to network
+// Cache-first: serve from cache, fall back to network.
+// HTML responses get COOP/COEP headers injected so the page becomes
+// cross-origin isolated, which unlocks SharedArrayBuffer in all workers.
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    caches.match(e.request).then(async r => {
+      const response = r || await fetch(e.request);
+      const ct = response.headers.get('content-type') || '';
+      if (!ct.includes('text/html')) return response;
+      const headers = new Headers(response.headers);
+      headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+      headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    })
   );
 });

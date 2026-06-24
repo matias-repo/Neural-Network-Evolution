@@ -1,27 +1,44 @@
 importScripts('config.js', 'NeuralNetwork.js', 'Maze.js', 'Agent.js');
 
 // Stateless episode runner. Receives one 'run' message via its MessageChannel
-// port (handed over by the main thread during init), simulates the full
-// episode, and returns a 'result'. If display=true, also sends 'frame'
-// messages every ~16 ms for rendering.
+// port, simulates the full episode, and returns a 'result'. If display=true,
+// also sends 'frame' messages every ~16 ms for rendering.
+//
+// The maze is read from a SharedArrayBuffer (zero-copy) when the page is
+// cross-origin isolated; otherwise it falls back to the mazeGrid clone sent
+// in the run message.
 
-let port = null;
+let port       = null;
+let mazeShared = null;  // Uint8Array view of coordinator's SharedArrayBuffer
+let mazeCols   = 0;
 
 self.onmessage = ({ data: msg }) => {
   if (msg.type === 'init') {
     port = msg.port;
-    port.onmessage = ({ data }) => { if (data.type === 'run') runEpisode(data); };
+    port.onmessage = ({ data }) => {
+      if (data.type === 'run')        runEpisode(data);
+      else if (data.type === 'sharedMaze') {
+        mazeShared = new Uint8Array(data.sab);
+        mazeCols   = data.cols;
+      }
+    };
   }
 };
 
 function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config, display }) {
   if (config) Object.assign(CONFIG, config);
 
-  // Reconstruct maze from baseline grid
+  // Reconstruct maze — from SAB (zero-copy) if available, else from cloned grid
   const maze = new Maze(CONFIG.COLS, CONFIG.ROWS, CONFIG.CELL_SIZE);
-  for (let r = 0; r < maze.rows; r++)
-    for (let c = 0; c < maze.cols; c++)
-      maze.grid[r][c] = mazeGrid[r][c];
+  if (mazeShared) {
+    for (let r = 0; r < maze.rows; r++)
+      for (let c = 0; c < maze.cols; c++)
+        maze.grid[r][c] = mazeShared[r * mazeCols + c];
+  } else {
+    for (let r = 0; r < maze.rows; r++)
+      for (let c = 0; c < maze.cols; c++)
+        maze.grid[r][c] = mazeGrid[r][c];
+  }
 
   // Wire up neural networks
   const predNN  = new NeuralNetwork(CONFIG.PRED_NN_LAYERS);

@@ -37,8 +37,10 @@ let ports       = [];   // direct MessagePort to each episode worker
 // ── Render / maze state ───────────────────────────────────────────────────
 let lastSnap    = null;        // { pred, prey, prey2 } from last display-worker frame
 let displayEp   = 0;           // episode index worker-0 is currently rendering
-let mazeSave    = null;         // baseline grid (2-D number array) sent to every episode
+let mazeSave    = null;         // baseline grid (2-D number array) — source of truth
 let mazeDirty   = false;
+let mazeSAB     = null;         // SharedArrayBuffer for maze (one alloc, zero per-dispatch clones)
+let mazeShared  = null;         // Uint8Array view of mazeSAB
 let cfgOverride = null;         // layout config forwarded to episode workers
 let lastSaveMs  = 0;            // timestamp of last save; throttles saves to ≤1 per 5 s
 
@@ -97,6 +99,7 @@ function _handleMessage(msg) {
       for (let r = 0; r < mazeSave.length; r++)
         for (let c = 0; c < mazeSave[r].length; c++)
           mazeSave[r][c] = msg.grid[r][c];
+      _syncSharedMaze();
       mazeDirty = true;
       _resetGeneration();
       break;
@@ -153,11 +156,32 @@ function _initCoord(config, simState, mazeState) {
 
   _initPopulations();
   if (simState) _tryRestore(simState);
+  _createSharedMaze();
 
   initialized = true;
   _startGeneration();
 
   if (!tickStarted) { tickStarted = true; tick(); }
+}
+
+// Allocate a SharedArrayBuffer for the maze so episode workers read it
+// directly with zero per-dispatch cloning. Falls back gracefully if the
+// page is not cross-origin isolated (e.g. before SW activates on first load).
+function _createSharedMaze() {
+  if (typeof SharedArrayBuffer === 'undefined') return;
+  mazeSAB    = new SharedArrayBuffer(CONFIG.ROWS * CONFIG.COLS);
+  mazeShared = new Uint8Array(mazeSAB);
+  _syncSharedMaze();
+  ports.forEach(p => {
+    if (p) p.postMessage({ type: 'sharedMaze', sab: mazeSAB, rows: CONFIG.ROWS, cols: CONFIG.COLS });
+  });
+}
+
+function _syncSharedMaze() {
+  if (!mazeShared || !mazeSave) return;
+  for (let r = 0; r < CONFIG.ROWS; r++)
+    for (let c = 0; c < CONFIG.COLS; c++)
+      mazeShared[r * CONFIG.COLS + c] = mazeSave[r][c];
 }
 
 function _initPopulations() {
@@ -243,7 +267,7 @@ function _dispatch(wIdx) {
     predW:    predPop[epIdx].getWeights(),
     prey1W:   preyPop[epIdx].getWeights(),
     prey2W:   preyPop2[epIdx].getWeights(),
-    mazeGrid: mazeSave,
+    mazeGrid: mazeShared ? null : mazeSave,  // omit when SAB is active
     config:   cfgOverride,
     display:  wIdx === 0,
   });
