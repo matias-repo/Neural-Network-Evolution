@@ -276,7 +276,11 @@ function _evolve() {
     history,
   });
 
-  // Prepare next generation; dispatch only when not paused
+  // Prepare next generation; dispatch only when not paused.
+  // Reset workerBusy: the worker that sent the final result goes straight to
+  // _evolve() without passing through _dispatch(), so its busy flag is never
+  // cleared otherwise — causing a leak of one slot per generation.
+  workerBusy   = new Array(NUM_WORKERS).fill(false);
   predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
