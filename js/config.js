@@ -1,4 +1,4 @@
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 
 const CONFIG = {
   // Grid – portrait 18×30 at 20 px = 360×600
@@ -30,7 +30,7 @@ const CONFIG = {
   MAX_EPISODE_FRAMES: 800,
   EPISODE_FRAMES_RAMP_GENS: 500,  // generations to reach MAX
   MIN_START_DIST: 150,
-  CATCH_DIST: 20,
+  CATCH_DIST: 40,
 
   // Evolution
   POP_SIZE: 100,
@@ -55,7 +55,11 @@ const CONFIG = {
   PREY_NN_LAYERS: [25, 14, 7, 3],
 
   // Fitness shaping
-  PRED_PROXIMITY_WEIGHT: 0.15,
+  PRED_PROXIMITY_WEIGHT: 0.8,
+
+  // Active agent counts — adjustable at runtime via UI (1 or 2 per side)
+  NUM_PREDATORS: 2,
+  NUM_PREY: 2,
 
   // Wall interaction
   WALL_INTERACT_COOLDOWN: 20,

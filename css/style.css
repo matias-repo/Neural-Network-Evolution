@@ -104,6 +104,15 @@ button.dim-btn:hover { color: var(--text-dim); }
   opacity: 0.6;
 }
 
+/* Agent count toggle buttons */
+.pred-count-btn { color: rgba(220, 80, 80, 0.55); font-weight: 700; letter-spacing: 0; }
+.pred-count-btn:hover { color: #e06060; border-color: #5a1a1a; }
+.pred-count-btn.count-single { color: rgba(220, 80, 80, 0.25); }
+
+.prey-count-btn { color: rgba(30, 180, 100, 0.55); font-weight: 700; letter-spacing: 0; }
+.prey-count-btn:hover { color: #30c870; border-color: #0e4028; }
+.prey-count-btn.count-single { color: rgba(30, 180, 100, 0.25); }
+
 .spacer { flex: 1; }
 
 .chk-label {

@@ -10,6 +10,9 @@ class UI {
     this.SPEEDS = [0, 1, 5, 20, 100];
     this._dragAction = null;   // 'draw' | 'erase', determined on each mousedown
 
+    this.numPredators = CONFIG.NUM_PREDATORS ?? 2;
+    this.numPrey      = CONFIG.NUM_PREY      ?? 2;
+
     this._mouseDown = false;
     this._lastCell = null;
     this._hoverCell = null;
@@ -32,6 +35,9 @@ class UI {
     });
     this._on('btn-edit', 'click', () => this._toggleEdit());
     this._on('btn-speed', 'click', () => this._cycleSpeed());
+
+    this._on('btn-pred-count', 'click', () => this._cycleAgentCount('pred'));
+    this._on('btn-prey-count', 'click', () => this._cycleAgentCount('prey'));
 
     this._on('btn-clear', 'click', () => { this.maze.clear(); });
 
@@ -231,6 +237,26 @@ class UI {
 
     const bar = document.getElementById('edit-bar');
     if (bar) bar.classList.toggle('visible', this.mode === 'edit');
+  }
+
+  _cycleAgentCount(type) {
+    if (type === 'pred') {
+      this.numPredators = this.numPredators === 2 ? 1 : 2;
+      const btn = document.getElementById('btn-pred-count');
+      if (btn) {
+        btn.textContent = `${this.numPredators}P`;
+        btn.classList.toggle('count-single', this.numPredators === 1);
+      }
+      this.worker.postMessage({ type: 'setAgentCount', numPredators: this.numPredators });
+    } else {
+      this.numPrey = this.numPrey === 2 ? 1 : 2;
+      const btn = document.getElementById('btn-prey-count');
+      if (btn) {
+        btn.textContent = `${this.numPrey}Y`;
+        btn.classList.toggle('count-single', this.numPrey === 1);
+      }
+      this.worker.postMessage({ type: 'setAgentCount', numPrey: this.numPrey });
+    }
   }
 
   // Stats are now rendered as a HUD overlay on the canvas; nothing to update in DOM.

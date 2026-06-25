@@ -113,6 +113,13 @@ function _handleMessage(msg) {
       _resetGeneration();
       break;
 
+    case 'setAgentCount':
+      if (!cfgOverride) cfgOverride = {};
+      if (msg.numPredators !== undefined) cfgOverride.NUM_PREDATORS = msg.numPredators;
+      if (msg.numPrey      !== undefined) cfgOverride.NUM_PREY      = msg.numPrey;
+      _resetGeneration();
+      break;
+
   }
 }
 
@@ -319,17 +326,25 @@ function _dispatchIdle() {
 }
 
 function _evolve() {
-  const predResult  = ga.evolve(predPop,  predFitness);
-  const pred2Result = ga.evolve(predPop2, pred2Fitness);
-  const preyResult  = ga.evolve(preyPop,  preyFitness);
-  const prey2Result = ga.evolve(preyPop2, prey2Fitness);
+  const nPred = (cfgOverride?.NUM_PREDATORS) ?? CONFIG.NUM_PREDATORS ?? 2;
+  const nPrey = (cfgOverride?.NUM_PREY)      ?? CONFIG.NUM_PREY      ?? 2;
+
+  const predResult  = ga.evolve(predPop, predFitness);
+  // Freeze inactive populations: preserve weights unchanged, report zero fitness
+  const pred2Result = nPred >= 2
+    ? ga.evolve(predPop2, pred2Fitness)
+    : { population: predPop2, best: 0, avg: 0 };
+  const preyResult  = ga.evolve(preyPop, preyFitness);
+  const prey2Result = nPrey >= 2
+    ? ga.evolve(preyPop2, prey2Fitness)
+    : { population: preyPop2, best: 0, avg: 0 };
 
   history.push({
     gen:      generation,
-    predBest: Math.max(predResult.best, pred2Result.best),
-    predAvg:  (predResult.avg + pred2Result.avg) / 2,
-    preyBest: Math.max(preyResult.best, prey2Result.best),
-    preyAvg:  (preyResult.avg + prey2Result.avg) / 2,
+    predBest: nPred >= 2 ? Math.max(predResult.best, pred2Result.best) : predResult.best,
+    predAvg:  nPred >= 2 ? (predResult.avg + pred2Result.avg) / 2      : predResult.avg,
+    preyBest: nPrey >= 2 ? Math.max(preyResult.best, prey2Result.best) : preyResult.best,
+    preyAvg:  nPrey >= 2 ? (preyResult.avg + prey2Result.avg) / 2      : preyResult.avg,
   });
 
   predPop  = predResult.population;
