@@ -45,15 +45,18 @@ class Maze {
     return this.isWall(col, row);
   }
 
-  // Circle vs grid collision – returns true if circle overlaps any wall cell
+  // Circle vs grid collision – returns true if the circle's bounding box overlaps any wall cell.
+  // Checks every cell in the bounding box rather than 8 sampled points, so diagonal approaches
+  // and thin walls are handled correctly. With r=7 and cellSize=20 this is at most a 2×2 scan.
   isBlocked(x, y, r) {
-    const checks = [
-      [x - r, y], [x + r, y],
-      [x, y - r], [x, y + r],
-      [x - r, y - r], [x + r, y - r],
-      [x - r, y + r], [x + r, y + r],
-    ];
-    for (const [px, py] of checks) if (this.isWallAt(px, py)) return true;
+    const cs = this.cellSize;
+    const c0 = Math.floor((x - r) / cs);
+    const c1 = Math.floor((x + r) / cs);
+    const r0 = Math.floor((y - r) / cs);
+    const r1 = Math.floor((y + r) / cs);
+    for (let row = r0; row <= r1; row++)
+      for (let col = c0; col <= c1; col++)
+        if (this.isWall(col, row)) return true;
     return false;
   }
 
