@@ -102,6 +102,7 @@ function init() {
 
       const simProxy = {
         predator:        makeAgent(lastState.pred),
+        predator2:       makeAgent(lastState.pred2),
         prey:            makeAgent(lastState.prey),
         prey2:           makeAgent(lastState.prey2),
         generation:      lastState.generation,

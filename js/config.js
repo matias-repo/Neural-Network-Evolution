@@ -1,4 +1,4 @@
-const VERSION = '1.0.10';
+const VERSION = '1.1.0';
 
 const CONFIG = {
   // Grid – portrait 18×30 at 20 px = 360×600
@@ -8,56 +8,60 @@ const CONFIG = {
 
   // Agent physics
   AGENT_RADIUS: 7,
-  PRED_MAX_SPEED: 4.2,   // predator is faster so it can actually catch prey
+  PRED_MAX_SPEED: 4.2,
   PREY_MAX_SPEED: 3.5,
-  MAX_SPEED: 4.2,        // normalization reference for NN velocity inputs (= pred top speed)
+  MAX_SPEED: 4.2,        // normalization reference for NN velocity inputs
   ACCELERATION: 0.55,
   FRICTION: 0.80,
+
+  // Stamina — agents tire at high speed and recover at rest
+  STAMINA_DRAIN: 0.004,  // deducted per frame × (speed / topSpeed)
+  STAMINA_REGEN: 0.001,  // added per frame passively
+  STAMINA_MIN:   0.2,    // floor — agents never fully stop
 
   // Sensors
   RAY_COUNT: 8,
   RAY_MAX_DIST: 150,
-  RAY_STEP: 6,           // coarser but 2× faster ray marching
+  RAY_STEP: 6,
 
-  // Episode
-  EPISODE_FRAMES: 500,   // fewer frames → faster generations
-  MIN_START_DIST: 150,   // scaled for narrower canvas
+  // Episode — length ramps from MIN to MAX over RAMP_GENS generations
+  EPISODE_FRAMES: 200,            // initial value; overridden per-generation by coordinator
+  MIN_EPISODE_FRAMES: 200,
+  MAX_EPISODE_FRAMES: 800,
+  EPISODE_FRAMES_RAMP_GENS: 500,  // generations to reach MAX
+  MIN_START_DIST: 150,
   CATCH_DIST: 20,
 
   // Evolution
-  POP_SIZE: 100,         // larger pop = better weight-space coverage per generation
+  POP_SIZE: 100,
   MUTATION_RATE: 0.12,
   MUTATION_STRENGTH: 0.25,
-  ELITE_COUNT: 5,        // ~5% elitism (was 10% at pop 30) — more room for diversity
+  ELITE_COUNT: 5,
 
-  // Neural-network layer sizes — predator and prey have different input counts
-  // Predator (21 inputs): rays[0-7],
-  //                       rel(prey1) x/y, rel(prey2) x/y,   ← relative, not absolute
-  //                       own vx/vy, prey1 vx/vy, prey2 vx/vy,
-  //                       prey1_alive, prey2_alive, carryingWall
-  // Prey (20 inputs):     rays[0-7],
-  //                       rel(predator) x/y, rel(ally) x/y, ← relative, not absolute
-  //                       own vx/vy, predator vx/vy, ally vx/vy,
-  //                       ally_alive, carryingWall
+  // Neural-network layer sizes — 2 predators vs 2 prey, with stamina
+  //
+  // Predator (26 inputs): rays[0-7],
+  //   rel(prey1) x/y, rel(prey2) x/y, rel(ally_pred) x/y,
+  //   own vx/vy, prey1 vx/vy, prey2 vx/vy, ally_pred vx/vy,
+  //   prey1_alive, prey2_alive, stamina, carryingWall
+  //
+  // Prey (25 inputs): rays[0-7],
+  //   rel(pred1) x/y, rel(pred2) x/y, rel(ally) x/y,
+  //   own vx/vy, pred1 vx/vy, pred2 vx/vy, ally vx/vy,
+  //   ally_alive, stamina, carryingWall
+  //
   // Outputs (both): ax, ay, interact
-  // Relative positions mean "direction to target" is directly readable by a single
-  // linear layer — the NN no longer needs to learn subtraction from absolute coords.
-  PRED_NN_LAYERS: [21, 12, 6, 3],
-  PREY_NN_LAYERS: [20, 12, 6, 3],
+  PRED_NN_LAYERS: [26, 14, 7, 3],
+  PREY_NN_LAYERS: [25, 14, 7, 3],
 
   // Fitness shaping
-  // Predator gets a proximity bonus proportional to its closest approach.
-  // Weight kept small (0.15) so any catch is always worth more than proximity alone —
-  // avoids the local optimum of "orbit near prey without committing to the catch."
-  //   proximity @ 50px  = 0.15 × 0.93 × 500 ≈  70  (always < slowest catch ≈ 135)
-  //   catch at frame 490 = (500-490) + 125    = 135
   PRED_PROXIMITY_WEIGHT: 0.15,
 
   // Wall interaction
-  WALL_INTERACT_COOLDOWN: 20,    // sim-frames between pickups / placements
-  WALL_CARRY_SPEED: 0.65,        // max-speed multiplier while holding a wall
-  WALL_INTERACT_THRESHOLD: 0.9,  // NN interact output must exceed this to trigger — prevents noise-driven pickups
-  WALL_PICKUP_BONUS: 0,          // direct bonus removed — strategic use earns fitness through primary objectives
+  WALL_INTERACT_COOLDOWN: 20,
+  WALL_CARRY_SPEED: 0.65,
+  WALL_INTERACT_THRESHOLD: 0.9,
+  WALL_PICKUP_BONUS: 0,
 
   // Canvas
   CANVAS_W: 360,

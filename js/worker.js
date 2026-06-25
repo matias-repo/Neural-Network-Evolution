@@ -15,9 +15,11 @@ const ga = new GeneticAlgorithm({
 
 // ── Population state ──────────────────────────────────────────────────────
 let predPop   = [];
+let predPop2  = [];
 let preyPop   = [];
 let preyPop2  = [];
 let predFitness  = [];
+let pred2Fitness = [];
 let preyFitness  = [];
 let prey2Fitness = [];
 let generation   = 0;
@@ -35,7 +37,7 @@ let workerBusy  = [false];
 let ports       = [];   // direct MessagePort to each episode worker
 
 // ── Render / maze state ───────────────────────────────────────────────────
-let lastSnap    = null;        // { pred, prey, prey2 } from last display-worker frame
+let lastSnap    = null;        // { pred, pred2, prey, prey2 } from last display-worker frame
 let displayEp   = 0;           // episode index worker-0 is currently rendering
 let mazeSave    = null;         // baseline grid (2-D number array) — canonical source of truth for episodes
 let displayMaze = null;         // mid-episode view: diverges from mazeSave when agents pick up/place walls
@@ -43,6 +45,7 @@ let mazeDirty   = false;
 let mazeSAB     = null;         // SharedArrayBuffer for maze (one alloc, zero per-dispatch clones)
 let mazeShared  = null;         // Uint8Array view of mazeSAB
 let cfgOverride = null;         // layout config forwarded to episode workers
+let episodeCfg  = null;         // cfgOverride + current EPISODE_FRAMES (set each generation)
 let lastSaveMs  = 0;            // timestamp of last save; throttles saves to ≤1 per 5 s
 
 // ── Speed ─────────────────────────────────────────────────────────────────
@@ -119,7 +122,7 @@ function _handleMessage(msg) {
 function _onEpisodeMsg(wIdx, data) {
   if (data.type === 'frame') {
     if (wIdx === 0) {
-      lastSnap = { pred: data.pred, prey: data.prey, prey2: data.prey2 };
+      lastSnap = { pred: data.pred, pred2: data.pred2, prey: data.prey, prey2: data.prey2 };
       if (data.maze) { displayMaze = data.maze; mazeDirty = true; }
     }
     return;
@@ -128,12 +131,13 @@ function _onEpisodeMsg(wIdx, data) {
   if (data.genId !== genId) return;  // stale result from a superseded generation
 
   predFitness[data.idx]  = data.predFit;
+  pred2Fitness[data.idx] = data.pred2Fit;
   preyFitness[data.idx]  = data.prey1Fit;
   prey2Fitness[data.idx] = data.prey2Fit;
   totalFrames += data.frame;
   completedEpisodes++;
 
-  if (wIdx === 0) lastSnap = { pred: data.pred, prey: data.prey, prey2: data.prey2 };
+  if (wIdx === 0) lastSnap = { pred: data.pred, pred2: data.pred2, prey: data.prey, prey2: data.prey2 };
 
   if (completedEpisodes >= CONFIG.POP_SIZE) {
     _evolve();
@@ -195,9 +199,11 @@ function _syncSharedMaze() {
 
 function _initPopulations() {
   predPop  = Array.from({ length: CONFIG.POP_SIZE }, () => new NeuralNetwork(CONFIG.PRED_NN_LAYERS));
+  predPop2 = Array.from({ length: CONFIG.POP_SIZE }, () => new NeuralNetwork(CONFIG.PRED_NN_LAYERS));
   preyPop  = Array.from({ length: CONFIG.POP_SIZE }, () => new NeuralNetwork(CONFIG.PREY_NN_LAYERS));
   preyPop2 = Array.from({ length: CONFIG.POP_SIZE }, () => new NeuralNetwork(CONFIG.PREY_NN_LAYERS));
   predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  pred2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
   preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
 }
@@ -206,19 +212,23 @@ function _tryRestore(data) {
   try {
     if (!data) return false;
     if (!data.predPop  || data.predPop.length  !== CONFIG.POP_SIZE) return false;
+    if (!data.predPop2 || data.predPop2.length !== CONFIG.POP_SIZE) return false;
     if (!data.preyPop  || data.preyPop.length  !== CONFIG.POP_SIZE) return false;
     if (!data.preyPop2 || data.preyPop2.length !== CONFIG.POP_SIZE) return false;
     const expPredLen = predPop[0].getWeights().length;
     const expPreyLen = preyPop[0].getWeights().length;
     if (data.predPop[0].length  !== expPredLen) return false;
+    if (data.predPop2[0].length !== expPredLen) return false;
     if (data.preyPop[0].length  !== expPreyLen) return false;
     if (data.preyPop2[0].length !== expPreyLen) return false;
     generation = data.generation || 0;
     history    = data.history    || [];
     data.predPop.forEach( (w, i) => predPop[i].setWeights(w));
+    data.predPop2.forEach((w, i) => predPop2[i].setWeights(w));
     data.preyPop.forEach( (w, i) => preyPop[i].setWeights(w));
     data.preyPop2.forEach((w, i) => preyPop2[i].setWeights(w));
     predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+    pred2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
     preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
     prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
     return true;
@@ -228,7 +238,15 @@ function _tryRestore(data) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Generation management
 // ═══════════════════════════════════════════════════════════════════════════
+
+// Episode length ramps linearly from MIN to MAX over RAMP_GENS generations
+function _currentEpisodeFrames() {
+  const frac = Math.min(1, generation / CONFIG.EPISODE_FRAMES_RAMP_GENS);
+  return Math.round(CONFIG.MIN_EPISODE_FRAMES + (CONFIG.MAX_EPISODE_FRAMES - CONFIG.MIN_EPISODE_FRAMES) * frac);
+}
+
 function _startGeneration() {
+  episodeCfg = Object.assign({}, cfgOverride, { EPISODE_FRAMES: _currentEpisodeFrames() });
   completedEpisodes = 0;
   episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
   displayEp = 0;
@@ -238,14 +256,18 @@ function _startGeneration() {
 
 function _resetGeneration() {
   genId++;
+  episodeCfg = Object.assign({}, cfgOverride, { EPISODE_FRAMES: _currentEpisodeFrames() });
   workerBusy = new Array(NUM_WORKERS).fill(false);
   predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  pred2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
   preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
   completedEpisodes = 0;
   episodeQueue = Array.from({ length: CONFIG.POP_SIZE }, (_, i) => i);
   displayEp = 0;
   lastSnap  = null;
+  displayMaze = null;
+  mazeDirty = true;
   if (!paused) _dispatchIdle();
 }
 
@@ -280,10 +302,11 @@ function _dispatch(wIdx) {
     idx:           epIdx,
     genId,
     predW:         predPop[epIdx].getWeights(),
+    pred2W:        predPop2[epIdx].getWeights(),
     prey1W:        preyPop[epIdx].getWeights(),
     prey2W:        preyPop2[epIdx].getWeights(),
     mazeGrid:      mazeShared ? null : mazeSave,
-    config:        cfgOverride,
+    config:        episodeCfg,
     display:       wIdx === 0,
     stepsPerFrame: wIdx === 0 ? speedSteps : 0,  // only throttle the display worker
   });
@@ -297,18 +320,20 @@ function _dispatchIdle() {
 
 function _evolve() {
   const predResult  = ga.evolve(predPop,  predFitness);
+  const pred2Result = ga.evolve(predPop2, pred2Fitness);
   const preyResult  = ga.evolve(preyPop,  preyFitness);
   const prey2Result = ga.evolve(preyPop2, prey2Fitness);
 
   history.push({
     gen:      generation,
-    predBest: predResult.best,
-    predAvg:  predResult.avg,
+    predBest: Math.max(predResult.best, pred2Result.best),
+    predAvg:  (predResult.avg + pred2Result.avg) / 2,
     preyBest: Math.max(preyResult.best, prey2Result.best),
     preyAvg:  (preyResult.avg + prey2Result.avg) / 2,
   });
 
   predPop  = predResult.population;
+  predPop2 = pred2Result.population;
   preyPop  = preyResult.population;
   preyPop2 = prey2Result.population;
   generation++;
@@ -316,6 +341,7 @@ function _evolve() {
   _postSave({
     generation,
     predPop:  predPop.map(nn  => nn.getWeights()),
+    predPop2: predPop2.map(nn => nn.getWeights()),
     preyPop:  preyPop.map(nn  => nn.getWeights()),
     preyPop2: preyPop2.map(nn => nn.getWeights()),
     history,
@@ -327,6 +353,7 @@ function _evolve() {
   // cleared otherwise — causing a leak of one slot per generation.
   workerBusy   = new Array(NUM_WORKERS).fill(false);
   predFitness  = new Array(CONFIG.POP_SIZE).fill(0);
+  pred2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
   preyFitness  = new Array(CONFIG.POP_SIZE).fill(0);
   prey2Fitness = new Array(CONFIG.POP_SIZE).fill(0);
   completedEpisodes = 0;
@@ -334,7 +361,7 @@ function _evolve() {
   displayEp = 0;
   lastSnap  = null;
 
-  if (!paused) _dispatchIdle();
+  _startGeneration();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -364,6 +391,7 @@ function _flush() {
   const msg = {
     type:            'frame',
     pred:            lastSnap ? lastSnap.pred  : null,
+    pred2:           lastSnap ? lastSnap.pred2 : null,
     prey:            lastSnap ? lastSnap.prey  : null,
     prey2:           lastSnap ? lastSnap.prey2 : null,
     generation,

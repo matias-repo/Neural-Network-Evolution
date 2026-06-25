@@ -26,18 +26,22 @@ class Renderer {
     this._drawMaze(maze, mode);
 
     if (mode !== 'edit') {
-      const dist1 = sim.predator && sim.prey
-        ? Math.hypot(sim.predator.x - sim.prey.x,  sim.predator.y - sim.prey.y)
-        : Infinity;
-      const dist2 = sim.predator && sim.prey2
-        ? Math.hypot(sim.predator.x - sim.prey2.x, sim.predator.y - sim.prey2.y)
-        : Infinity;
-      const nearestDist = Math.min(dist1, dist2);
+      // Distance from each predator to its nearest living prey
+      const d1a = sim.predator && sim.prey  ? Math.hypot(sim.predator.x - sim.prey.x,  sim.predator.y - sim.prey.y)  : Infinity;
+      const d1b = sim.predator && sim.prey2 ? Math.hypot(sim.predator.x - sim.prey2.x, sim.predator.y - sim.prey2.y) : Infinity;
+      const d2a = sim.predator2 && sim.prey  ? Math.hypot(sim.predator2.x - sim.prey.x,  sim.predator2.y - sim.prey.y)  : Infinity;
+      const d2b = sim.predator2 && sim.prey2 ? Math.hypot(sim.predator2.x - sim.prey2.x, sim.predator2.y - sim.prey2.y) : Infinity;
 
-      // Prey drawn first so predator appears on top
-      this._drawCharacter(sim.prey,     dist1,       sim.totalFrames);
-      this._drawCharacter(sim.prey2,    dist2,       sim.totalFrames);
-      this._drawCharacter(sim.predator, nearestDist, sim.totalFrames);
+      const nearPred1 = Math.min(d1a, d1b);  // predator1 distance to nearest prey
+      const nearPred2 = Math.min(d2a, d2b);  // predator2 distance to nearest prey
+      const nearPrey1 = Math.min(d1a, d2a);  // prey1 distance to nearest predator
+      const nearPrey2 = Math.min(d1b, d2b);  // prey2 distance to nearest predator
+
+      // Prey drawn first so predators appear on top
+      this._drawCharacter(sim.prey,      nearPrey1, sim.totalFrames);
+      this._drawCharacter(sim.prey2,     nearPrey2, sim.totalFrames);
+      this._drawCharacter(sim.predator,  nearPred1, sim.totalFrames);
+      this._drawCharacter(sim.predator2, nearPred2, sim.totalFrames);
     }
 
     this._drawHUD(sim);
@@ -195,7 +199,7 @@ class Renderer {
     }
 
     const maxVal = Math.max(
-      CONFIG.EPISODE_FRAMES * 1.5,
+      CONFIG.MAX_EPISODE_FRAMES * 1.5,
       ...history.map(h => Math.max(h.predBest, h.preyBest))
     );
     const pad = { t: 4, b: 14, l: 4, r: 4 };
