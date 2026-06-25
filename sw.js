@@ -3,6 +3,7 @@ const CACHE = 'nnevo-v1.1.1';
 const ASSETS = [
   './',
   'index.html',
+  'graph.html',
   'manifest.json',
   'css/style.css',
   'js/config.js',

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NNEvo — Fitness History</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #080810;
+      --panel:   #0d0d18;
+      --border:  #1e1e30;
+      --text:    #8890b0;
+      --dim:     #2e2e48;
+      --red:     #ff4444;
+      --green:   #00e878;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+      gap: 14px;
+    }
+
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .logo {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #22223a;
+      text-transform: uppercase;
+    }
+    .subtitle {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .chart-wrap {
+      position: relative;
+      width: min(860px, 100%);
+    }
+    canvas#chart {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #08081a;
+      border: 1px solid var(--border);
+    }
+
+    #tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 7px 11px;
+      font-size: 10px;
+      line-height: 1.9;
+      display: none;
+      white-space: nowrap;
+    }
+    .tt-gen  { color: var(--dim); }
+    .tt-pred { color: var(--red); }
+    .tt-prey { color: var(--green); }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px 22px;
+      justify-content: center;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 10px;
+      color: var(--dim);
+    }
+    .swatch {
+      width: 24px;
+      height: 2px;
+      border-radius: 1px;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .stat-label { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+    .stat-val   { font-size: 16px; font-weight: 700; letter-spacing: -0.5px; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      background: transparent;
+      color: var(--dim);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: color 0.1s, border-color 0.1s, background 0.1s;
+      min-height: 30px;
+    }
+    button:hover { color: var(--text); border-color: var(--dim); background: #0d0d1a; }
+    button.active { color: #a0b4ff; border-color: #2a3878; background: #1a2060; }
+
+    .live-label { font-size: 10px; color: #1e1e38; }
+    .live-label.on { color: #2a5040; }
+
+    #no-data {
+      font-size: 11px;
+      color: #1e1e38;
+      text-align: center;
+      padding: 40px 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">NNEvo</span>
+  <span class="subtitle">Fitness History</span>
+</header>
+
+<div class="chart-wrap">
+  <canvas id="chart" width="860" height="430"></canvas>
+  <div id="tooltip">
+    <div class="tt-gen"  id="tt-gen"></div>
+    <div class="tt-pred" id="tt-pred-best"></div>
+    <div class="tt-pred" id="tt-pred-avg" style="opacity:0.55"></div>
+    <div class="tt-prey" id="tt-prey-best"></div>
+    <div class="tt-prey" id="tt-prey-avg" style="opacity:0.55"></div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="swatch" style="background:var(--red)"></div>Pred best</div>
+  <div class="legend-item"><div class="swatch" style="background:rgba(255,68,68,0.35)"></div>Pred avg</div>
+  <div class="legend-item"><div class="swatch" style="background:var(--green)"></div>Prey best</div>
+  <div class="legend-item"><div class="swatch" style="background:rgba(0,232,120,0.35)"></div>Prey avg</div>
+</div>
+
+<div class="stats-row">
+  <div class="stat">
+    <span class="stat-val" id="s-gen"  style="color:var(--dim)">—</span>
+    <span class="stat-label">generation</span>
+  </div>
+  <div class="stat">
+    <span class="stat-val" id="s-pred-best" style="color:var(--red)">—</span>
+    <span class="stat-label">pred best</span>
+  </div>
+  <div class="stat">
+    <span class="stat-val" id="s-pred-avg"  style="color:rgba(255,68,68,0.5)">—</span>
+    <span class="stat-label">pred avg</span>
+  </div>
+  <div class="stat">
+    <span class="stat-val" id="s-prey-best" style="color:var(--green)">—</span>
+    <span class="stat-label">prey best</span>
+  </div>
+  <div class="stat">
+    <span class="stat-val" id="s-prey-avg"  style="color:rgba(0,232,120,0.5)">—</span>
+    <span class="stat-label">prey avg</span>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="btn-refresh">↺ Refresh</button>
+  <button id="btn-live">⏵ Live</button>
+  <span class="live-label" id="live-label">auto-refresh off</span>
+</div>
+
+<div id="no-data" hidden>No training data found in localStorage. Open the game first and let it run for at least one generation.</div>
+
+<script>
+const canvas  = document.getElementById('chart');
+const ctx     = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+const W = canvas.width;
+const H = canvas.height;
+const PAD = { t: 18, b: 38, l: 56, r: 18 };
+
+let history  = [];
+let liveOn   = false;
+let liveTimer = null;
+let hoverIdx = -1;
+
+// ── Data ──────────────────────────────────────────────────────────────────
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem('nn-evo-state');
+    if (!raw) { history = []; return; }
+    const s = JSON.parse(raw);
+    history = Array.isArray(s.history) ? s.history : [];
+  } catch (_) { history = []; }
+}
+
+// ── Chart rendering ────────────────────────────────────────────────────────
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#08081a';
+  ctx.fillRect(0, 0, W, H);
+
+  document.getElementById('no-data').hidden = history.length > 0;
+
+  if (history.length < 2) {
+    ctx.fillStyle = '#1e1e38';
+    ctx.font = '11px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      history.length === 0
+        ? 'No data — open the game and let it run'
+        : 'Waiting for second generation…',
+      W / 2, H / 2
+    );
+    ctx.textAlign = 'left';
+    return;
+  }
+
+  const allVals = history.flatMap(h => [h.predBest, h.predAvg, h.preyBest, h.preyAvg]);
+  const maxVal  = Math.max(...allVals, 1);
+
+  const cW = W - PAD.l - PAD.r;
+  const cH = H - PAD.t - PAD.b;
+  const toX = i  => PAD.l + (i / (history.length - 1)) * cW;
+  const toY = v  => PAD.t + cH - (v / maxVal) * cH;
+
+  // Grid lines + y-axis labels
+  const ticks = 5;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign    = 'right';
+  ctx.font         = '9px "Courier New", monospace';
+  for (let t = 0; t <= ticks; t++) {
+    const v   = (t / ticks) * maxVal;
+    const y   = toY(v);
+    ctx.fillStyle  = '#1a1a2a';
+    ctx.fillRect(PAD.l, y, cW, 1);
+    ctx.fillStyle  = '#2a2a42';
+    ctx.fillText(Math.round(v).toLocaleString(), PAD.l - 6, y);
+  }
+
+  // X-axis labels (sparse, ~6 labels)
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  const xStep = Math.max(1, Math.floor(history.length / 6));
+  for (let i = 0; i < history.length; i += xStep) {
+    const x = toX(i);
+    ctx.fillStyle = '#2a2a42';
+    ctx.fillText(history[i].gen, x, H - PAD.b + 6);
+  }
+  // Always label last
+  {
+    const x = toX(history.length - 1);
+    ctx.fillStyle = '#2a2a42';
+    ctx.fillText(history[history.length - 1].gen, x, H - PAD.b + 6);
+  }
+
+  // Axis labels
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillStyle    = '#1e1e38';
+  ctx.fillText('generation', W / 2, H - 2);
+
+  // Lines
+  const lines = [
+    { key: 'predAvg',  color: 'rgba(255,68,68,0.30)',  width: 1 },
+    { key: 'preyAvg',  color: 'rgba(0,232,120,0.30)',  width: 1 },
+    { key: 'predBest', color: 'rgba(255,68,68,1)',      width: 1.5 },
+    { key: 'preyBest', color: 'rgba(0,232,120,1)',      width: 1.5 },
+  ];
+  lines.forEach(({ key, color, width }) => {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = width;
+    history.forEach((h, i) => {
+      i === 0 ? ctx.moveTo(toX(i), toY(h[key])) : ctx.lineTo(toX(i), toY(h[key]));
+    });
+    ctx.stroke();
+  });
+
+  // Hover crosshair + dots
+  if (hoverIdx >= 0 && hoverIdx < history.length) {
+    const x  = toX(hoverIdx);
+    const h  = history[hoverIdx];
+
+    ctx.strokeStyle = '#2a2a40';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, PAD.t); ctx.lineTo(x, H - PAD.b);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    [
+      { v: h.predBest, color: '#ff4444' },
+      { v: h.predAvg,  color: 'rgba(255,68,68,0.5)' },
+      { v: h.preyBest, color: '#00e878' },
+      { v: h.preyAvg,  color: 'rgba(0,232,120,0.5)' },
+    ].forEach(({ v, color }) => {
+      ctx.beginPath();
+      ctx.arc(x, toY(v), 3, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  }
+
+  // Stats panel
+  const last = history[history.length - 1];
+  document.getElementById('s-gen').textContent       = last.gen.toLocaleString();
+  document.getElementById('s-pred-best').textContent = fmt(last.predBest);
+  document.getElementById('s-pred-avg').textContent  = fmt(last.predAvg);
+  document.getElementById('s-prey-best').textContent = fmt(last.preyBest);
+  document.getElementById('s-prey-avg').textContent  = fmt(last.preyAvg);
+}
+
+function fmt(v) { return Number.isFinite(v) ? v.toFixed(1) : '—'; }
+
+// ── Tooltip ───────────────────────────────────────────────────────────────
+
+canvas.addEventListener('mousemove', e => {
+  if (history.length < 2) return;
+  const rect  = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const mx    = (e.clientX - rect.left) * scaleX;
+  const cW    = W - PAD.l - PAD.r;
+  const frac  = Math.max(0, Math.min(1, (mx - PAD.l) / cW));
+  hoverIdx    = Math.round(frac * (history.length - 1));
+  draw();
+
+  const h = history[hoverIdx];
+  document.getElementById('tt-gen').textContent       = `gen ${h.gen}`;
+  document.getElementById('tt-pred-best').textContent = `pred best  ${fmt(h.predBest)}`;
+  document.getElementById('tt-pred-avg').textContent  = `pred avg   ${fmt(h.predAvg)}`;
+  document.getElementById('tt-prey-best').textContent = `prey best  ${fmt(h.preyBest)}`;
+  document.getElementById('tt-prey-avg').textContent  = `prey avg   ${fmt(h.preyAvg)}`;
+
+  const scaleY   = H / rect.height;
+  const ttX      = (e.clientX - rect.left) * scaleX;
+  const rightOf  = ttX < W * 0.6;
+  const cssX     = (e.clientX - rect.left) / rect.width * 100;
+  const cssY     = (e.clientY - rect.top)  / rect.height * 100;
+
+  tooltip.style.display  = 'block';
+  tooltip.style.left     = rightOf ? `calc(${cssX}% + 12px)` : '';
+  tooltip.style.right    = rightOf ? '' : `calc(${100 - cssX}% + 12px)`;
+  tooltip.style.top      = `${cssY}%`;
+  tooltip.style.transform = 'translateY(-50%)';
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoverIdx = -1;
+  tooltip.style.display = 'none';
+  draw();
+});
+
+// ── Controls ──────────────────────────────────────────────────────────────
+
+function refresh() {
+  loadHistory();
+  draw();
+  document.getElementById('live-label').textContent =
+    liveOn ? `live · updated ${new Date().toLocaleTimeString()}` : 'auto-refresh off';
+}
+
+document.getElementById('btn-refresh').addEventListener('click', refresh);
+
+document.getElementById('btn-live').addEventListener('click', () => {
+  liveOn = !liveOn;
+  const btn = document.getElementById('btn-live');
+  const lbl = document.getElementById('live-label');
+  btn.classList.toggle('active', liveOn);
+  if (liveOn) {
+    btn.textContent = '⏸ Live';
+    lbl.textContent = 'auto-refresh on';
+    lbl.classList.add('on');
+    liveTimer = setInterval(refresh, 2000);
+    refresh();
+  } else {
+    btn.textContent = '⏵ Live';
+    lbl.textContent = 'auto-refresh off';
+    lbl.classList.remove('on');
+    clearInterval(liveTimer);
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+
+refresh();
+</script>
+</body>
+</html>
