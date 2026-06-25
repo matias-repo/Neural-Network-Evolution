@@ -1,4 +1,4 @@
-const VERSION = '1.0.7';
+const VERSION = '1.0.8';
 
 const CONFIG = {
   // Grid – portrait 18×30 at 20 px = 360×600
@@ -31,18 +31,19 @@ const CONFIG = {
   ELITE_COUNT: 5,        // ~5% elitism (was 10% at pop 30) — more room for diversity
 
   // Neural-network layer sizes — predator and prey have different input counts
-  // Predator (23 inputs): rays[0-7], own x/y, prey1 x/y, prey2 x/y,
+  // Predator (21 inputs): rays[0-7],
+  //                       rel(prey1) x/y, rel(prey2) x/y,   ← relative, not absolute
   //                       own vx/vy, prey1 vx/vy, prey2 vx/vy,
   //                       prey1_alive, prey2_alive, carryingWall
-  // Prey (22 inputs):     rays[0-7], own x/y, predator x/y, ally x/y,
+  // Prey (20 inputs):     rays[0-7],
+  //                       rel(predator) x/y, rel(ally) x/y, ← relative, not absolute
   //                       own vx/vy, predator vx/vy, ally vx/vy,
   //                       ally_alive, carryingWall
   // Outputs (both): ax, ay, interact
-  // Smaller layers = fewer weights = tractable GA search with pop_size 30
-  //   Old [23,28,16,3] = 1187 weights — too large for pop_size 20
-  //   New [23,12,6,3]  =  387 weights — ~3× smaller, same expressiveness for chasing
-  PRED_NN_LAYERS: [23, 12, 6, 3],
-  PREY_NN_LAYERS: [22, 12, 6, 3],
+  // Relative positions mean "direction to target" is directly readable by a single
+  // linear layer — the NN no longer needs to learn subtraction from absolute coords.
+  PRED_NN_LAYERS: [21, 12, 6, 3],
+  PREY_NN_LAYERS: [20, 12, 6, 3],
 
   // Fitness shaping
   // Predator gets a proximity bonus proportional to its closest approach.

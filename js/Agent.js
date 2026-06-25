@@ -39,17 +39,17 @@ class Agent {
   // agent1: primary target  (predator → prey1,    prey → predator)
   // agent2: secondary agent (predator → prey2,    prey → ally prey)
   //
-  // Predator inputs [23]:
+  // Predator inputs [21]:
   //   [0-7]   wall rays
-  //   [8-9]   own x/y          [10-11] agent1 x/y   [12-13] agent2 x/y
-  //   [14-15] own vx/vy        [16-17] agent1 vx/vy [18-19] agent2 vx/vy
-  //   [20]    agent1 alive      [21]    agent2 alive  [22]    carryingWall
+  //   [8-9]   rel(agent1) x/y  [10-11] rel(agent2) x/y
+  //   [12-13] own vx/vy        [14-15] agent1 vx/vy    [16-17] agent2 vx/vy
+  //   [18]    agent1 alive      [19]    agent2 alive    [20]    carryingWall
   //
-  // Prey inputs [22]:
+  // Prey inputs [20]:
   //   [0-7]   wall rays
-  //   [8-9]   own x/y          [10-11] agent1 x/y   [12-13] agent2 x/y
-  //   [14-15] own vx/vy        [16-17] agent1 vx/vy [18-19] agent2 vx/vy
-  //   [20]    agent2 alive      [21]    carryingWall
+  //   [8-9]   rel(agent1) x/y  [10-11] rel(agent2) x/y
+  //   [12-13] own vx/vy        [14-15] agent1 vx/vy    [16-17] agent2 vx/vy
+  //   [18]    agent2 alive      [19]    carryingWall
   sense(maze, agent1, agent2) {
     const rc  = CONFIG.RAY_COUNT;
     const inp = this._inputs;
@@ -62,17 +62,13 @@ class Agent {
       inp[n++] = d;
     }
 
-    // Own position
-    inp[n++] = this.x / CONFIG.CANVAS_W;
-    inp[n++] = this.y / CONFIG.CANVAS_H;
+    // Relative position to agent1 (direction vector, readable by a single linear layer)
+    inp[n++] = (agent1.x - this.x) / CONFIG.CANVAS_W;
+    inp[n++] = (agent1.y - this.y) / CONFIG.CANVAS_H;
 
-    // Agent1 position
-    inp[n++] = agent1.x / CONFIG.CANVAS_W;
-    inp[n++] = agent1.y / CONFIG.CANVAS_H;
-
-    // Agent2 position
-    inp[n++] = agent2.x / CONFIG.CANVAS_W;
-    inp[n++] = agent2.y / CONFIG.CANVAS_H;
+    // Relative position to agent2
+    inp[n++] = (agent2.x - this.x) / CONFIG.CANVAS_W;
+    inp[n++] = (agent2.y - this.y) / CONFIG.CANVAS_H;
 
     // Own velocity
     inp[n++] = this.vx / CONFIG.MAX_SPEED;

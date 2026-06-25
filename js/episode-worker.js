@@ -56,9 +56,12 @@ async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config,
   prey1.reset(prey1Pos.x, prey1Pos.y);
   prey2.reset(prey2Pos.x, prey2Pos.y);
 
+  const maxT     = CONFIG.EPISODE_FRAMES;
+  const MAX_DIST = Math.hypot(CONFIG.CANVAS_W, CONFIG.CANVAS_H);
+
   let frame = 0;
   let catch1Frame = null, catch2Frame = null;
-  let minDist = Infinity, prey1MinDist = Infinity, prey2MinDist = Infinity;
+  let predProxSum = 0, prey1MinDist = Infinity, prey2MinDist = Infinity;
   let lastPost = 0;
   let stepsSincePost = 0;
   const throttled = display && stepsPerFrame > 0;
@@ -69,22 +72,25 @@ async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config,
     prey1.update(maze, predator, prey2);
     prey2.update(maze, predator, prey1);
 
+    let d1 = Infinity, d2 = Infinity;
     if (prey1.alive) {
-      const d = Math.hypot(predator.x - prey1.x, predator.y - prey1.y);
-      if (d < prey1MinDist) prey1MinDist = d;
-      if (d < minDist)      minDist      = d;
-      if (d <= CONFIG.CATCH_DIST) {
+      d1 = Math.hypot(predator.x - prey1.x, predator.y - prey1.y);
+      if (d1 < prey1MinDist) prey1MinDist = d1;
+      if (d1 <= CONFIG.CATCH_DIST) {
         prey1.alive = false; prey1.vx = prey1.vy = 0; catch1Frame = frame;
       }
     }
     if (prey2.alive) {
-      const d = Math.hypot(predator.x - prey2.x, predator.y - prey2.y);
-      if (d < prey2MinDist) prey2MinDist = d;
-      if (d < minDist)      minDist      = d;
-      if (d <= CONFIG.CATCH_DIST) {
+      d2 = Math.hypot(predator.x - prey2.x, predator.y - prey2.y);
+      if (d2 < prey2MinDist) prey2MinDist = d2;
+      if (d2 <= CONFIG.CATCH_DIST) {
         prey2.alive = false; prey2.vx = prey2.vy = 0; catch2Frame = frame;
       }
     }
+
+    const dNear = Math.min(d1, d2);
+    if (dNear < Infinity) predProxSum += Math.max(0, 1 - dNear / MAX_DIST);
+
     if (!prey1.alive && !prey2.alive) break;
 
     if (throttled) {
@@ -106,12 +112,8 @@ async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config,
     }
   }
 
-  // ── Fitness (mirrors Simulation._endEpisode logic) ────────────────────────
-  const maxT     = CONFIG.EPISODE_FRAMES;
-  const MAX_DIST = Math.hypot(CONFIG.CANVAS_W, CONFIG.CANVAS_H);
-  const closeness = Math.max(0, 1 - minDist / MAX_DIST);
-
-  let predFit = closeness * maxT * CONFIG.PRED_PROXIMITY_WEIGHT;
+  // ── Fitness ───────────────────────────────────────────────────────────────
+  let predFit = predProxSum * CONFIG.PRED_PROXIMITY_WEIGHT;
   if (catch1Frame !== null) predFit += (maxT - catch1Frame) + maxT * 0.25;
   if (catch2Frame !== null) predFit += (maxT - catch2Frame) + maxT * 0.25;
 
