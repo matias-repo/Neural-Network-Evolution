@@ -10,7 +10,8 @@
   --btn-hover: #141428;
   --btn-act:   #1a2060;
   --accent:    #4060d0;
-  --w:         360px;
+  --w:         360px;       /* game canvas CSS width — set by JS */
+  --total-w:   570px;       /* canvas + gap + chart — set by JS */
 }
 
 html { height: 100%; background: var(--bg); }
@@ -26,10 +27,10 @@ body {
   align-items: center;
 }
 
-/* ── Top bar ──────────────────────────────────────────────────────────────── */
+/* ── Top bar — spans full sim-row width ───────────────────────────────────── */
 
 .top-bar {
-  width: var(--w);
+  width: var(--total-w);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -128,12 +129,28 @@ button.dim-btn:hover { color: var(--text-dim); }
 }
 .chk-label input { accent-color: var(--accent); }
 
-/* ── Stage ────────────────────────────────────────────────────────────────── */
+/* ── Stage + sim-row layout ───────────────────────────────────────────────── */
 
 .stage {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Horizontal row: game canvas column on the left, chart panel on the right.
+   flex-wrap lets the chart fall below the canvas on very narrow screens. */
+.sim-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* Column that holds the game canvas + edit bar stacked vertically */
+.sim-col {
+  display: flex;
+  flex-direction: column;
 }
 
 .canvas-wrap {
@@ -161,6 +178,37 @@ button.dim-btn:hover { color: var(--text-dim); }
   pointer-events: none;
   display: none;
 }
+
+/* ── Chart panel ──────────────────────────────────────────────────────────── */
+
+.chart-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 200px;
+  flex-shrink: 0;
+}
+
+#chart-canvas {
+  display: block;
+  width: 200px;
+  background: #08081a;
+  border: 1px solid var(--border);
+  image-rendering: pixelated;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 9px;
+  padding: 0 2px;
+}
+
+.cl-pred-best { color: #ff4444; }
+.cl-pred-avg  { color: rgba(255, 68, 68, 0.4); }
+.cl-prey-best { color: #00ff88; }
+.cl-prey-avg  { color: rgba(0, 255, 136, 0.4); }
 
 /* ── Edit bar ─────────────────────────────────────────────────────────────── */
 
@@ -248,39 +296,4 @@ button.modal-danger:hover {
   background: #3a1010;
   border-color: #a03030;
   color: #f0a0a0;
-}
-
-/* ── Fitness chart modal ──────────────────────────────────────────────────── */
-
-.chart-modal-box {
-  width: 340px;
-  gap: 8px;
-}
-
-.chart-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.chart-close-btn {
-  padding: 0 6px;
-  min-height: 22px;
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-#chart-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--border);
-}
-
-.chart-legend {
-  display: flex;
-  gap: 10px;
-  font-size: 9px;
-  flex-wrap: wrap;
-  opacity: 0.8;
 }

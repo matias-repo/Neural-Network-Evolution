@@ -1,3 +1,5 @@
+const CHART_W = 200;  // CSS + pixel width of the chart panel canvas
+
 function computeLayout() {
   const cs      = CONFIG.CELL_SIZE;
   const headerH = 46; // top-bar height (buttons + padding + border)
@@ -7,8 +9,9 @@ function computeLayout() {
   CONFIG.ROWS     = rows;
   CONFIG.CANVAS_W = cols * cs;
   CONFIG.CANVAS_H = rows * cs;
-  // Propagate computed width to CSS so top-bar / edit-bar / canvas-wrap all match
-  document.documentElement.style.setProperty('--w', `${CONFIG.CANVAS_W}px`);
+  // --w: game canvas width; --total-w: canvas + gap + chart (used by top-bar)
+  document.documentElement.style.setProperty('--w',       `${CONFIG.CANVAS_W}px`);
+  document.documentElement.style.setProperty('--total-w', `${CONFIG.CANVAS_W + 10 + CHART_W}px`);
 }
 
 function init() {
@@ -20,6 +23,11 @@ function init() {
 
   const overlay = document.getElementById('editOverlay');
   if (overlay) { overlay.width = CONFIG.CANVAS_W; overlay.height = CONFIG.CANVAS_H; }
+
+  // Size chart canvas to match game canvas height
+  const chartCanvas = document.getElementById('chart-canvas');
+  chartCanvas.width  = CHART_W;
+  chartCanvas.height = CONFIG.CANVAS_H;
 
   const localMaze = new Maze(CONFIG.COLS, CONFIG.ROWS, CONFIG.CELL_SIZE);
   const renderer  = new Renderer(canvas);
@@ -41,7 +49,8 @@ function init() {
     return w;
   });
 
-  let lastState = null;
+  let lastState      = null;
+  let lastHistoryLen = 0;
 
   coordinator.onerror = (e) => console.error('[coordinator] error:', e.message, e);
 
@@ -52,6 +61,11 @@ function init() {
         for (let r = 0; r < localMaze.rows; r++)
           for (let c = 0; c < localMaze.cols; c++)
             localMaze.grid[r][c] = data.maze[r][c];
+      }
+      // Redraw chart only when a new generation completes (history grows)
+      if (data.history && data.history.length !== lastHistoryLen) {
+        lastHistoryLen = data.history.length;
+        renderer.drawChart(chartCanvas, data.history);
       }
     } else if (data.type === 'save') {
       try {
@@ -92,8 +106,6 @@ function init() {
     requestAnimationFrame(loop);
     try {
       if (!lastState) return;
-
-      ui.history = lastState.history || [];
 
       const makeAgent = (s) => s ? {
         type: s.type, x: s.x, y: s.y,

@@ -16,13 +16,12 @@
 </head>
 <body>
 
-<!-- Thin top bar -->
+<!-- Thin top bar — spans game canvas + chart panel -->
 <header class="top-bar">
   <span class="logo">NNEvo</span>
   <div class="top-controls">
     <button id="btn-play-pause" class="ctrl-btn" title="Play / Pause">⏸</button>
     <button id="btn-speed"      class="ctrl-btn speed-btn" title="Cycle speed">1×</button>
-    <button id="btn-chart"      class="ctrl-btn dim-btn"   title="Fitness chart">📈</button>
     <button id="btn-reset"      class="ctrl-btn dim-btn"   title="Reset evolution">↺</button>
     <div class="divider"></div>
     <button id="btn-pred-count" class="ctrl-btn pred-count-btn" title="Toggle predator count">2P</button>
@@ -35,48 +34,49 @@
   </div>
 </header>
 
-<!-- Canvas -->
+<!-- Simulation + chart side by side -->
 <main class="stage">
-  <div class="canvas-wrap">
-    <canvas id="gameCanvas"></canvas>
-    <canvas id="editOverlay"></canvas>
-  </div>
+  <div class="sim-row">
 
-  <!-- Edit toolbar – 2-row strip, shown only in edit mode -->
-  <div class="edit-bar" id="edit-bar">
-    <div class="edit-row">
-      <button id="btn-clear" class="dim-btn">Clear</button>
-      <div class="spacer"></div>
-      <button id="btn-save-maze" title="Save to browser">💾</button>
-      <button id="btn-load-maze" title="Load from browser">📂</button>
+    <!-- Left: game canvas + edit bar stacked -->
+    <div class="sim-col">
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas"></canvas>
+        <canvas id="editOverlay"></canvas>
+      </div>
+
+      <!-- Edit toolbar – shown only in edit mode -->
+      <div class="edit-bar" id="edit-bar">
+        <div class="edit-row">
+          <button id="btn-clear" class="dim-btn">Clear</button>
+          <div class="spacer"></div>
+          <button id="btn-save-maze" title="Save to browser">💾</button>
+          <button id="btn-load-maze" title="Load from browser">📂</button>
+        </div>
+        <div class="edit-row">
+          <span class="bar-label">Preset</span>
+          <button data-preset="empty">Empty</button>
+          <button data-preset="cross">Cross</button>
+          <button data-preset="rooms">Rooms</button>
+          <button data-preset="spiral">Spiral</button>
+          <button data-preset="zigzag">Zigzag</button>
+        </div>
+      </div>
     </div>
-    <div class="edit-row">
-      <span class="bar-label">Preset</span>
-      <button data-preset="empty">Empty</button>
-      <button data-preset="cross">Cross</button>
-      <button data-preset="rooms">Rooms</button>
-      <button data-preset="spiral">Spiral</button>
-      <button data-preset="zigzag">Zigzag</button>
+
+    <!-- Right: live fitness chart -->
+    <div class="chart-panel">
+      <canvas id="chart-canvas" width="200" height="600"></canvas>
+      <div class="chart-legend">
+        <span class="cl-pred-best">── pred</span>
+        <span class="cl-pred-avg">── avg</span>
+        <span class="cl-prey-best">── prey</span>
+        <span class="cl-prey-avg">── avg</span>
+      </div>
     </div>
+
   </div>
 </main>
-
-<!-- Fitness chart modal -->
-<div id="modal-chart" class="modal-overlay" hidden>
-  <div class="modal-box chart-modal-box">
-    <div class="chart-modal-header">
-      <div class="modal-title">Fitness History</div>
-      <button id="modal-chart-close" class="chart-close-btn">✕</button>
-    </div>
-    <canvas id="chart-canvas" width="560" height="300"></canvas>
-    <div class="chart-legend">
-      <span style="color:#ff4444">— pred best</span>
-      <span style="color:rgba(255,68,68,0.45)">— avg</span>
-      <span style="color:#00ff88">— prey best</span>
-      <span style="color:rgba(0,255,136,0.45)">— avg</span>
-    </div>
-  </div>
-</div>
 
 <!-- Reset confirmation modal -->
 <div id="modal-reset" class="modal-overlay" hidden>
