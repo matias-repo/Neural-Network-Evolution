@@ -64,6 +64,7 @@ async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config,
   let predProxSum = 0, prey1MinDist = Infinity, prey2MinDist = Infinity;
   let lastPost = 0;
   let stepsSincePost = 0;
+  let pendingMaze = null;  // maze snapshot to send with next frame (when walls change)
   const throttled = display && stepsPerFrame > 0;
 
   while (frame < CONFIG.EPISODE_FRAMES) {
@@ -71,6 +72,12 @@ async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config,
     predator.update(maze, prey1, prey2);
     prey1.update(maze, predator, prey2);
     prey2.update(maze, predator, prey1);
+
+    // Capture maze state when walls were picked up or placed this step
+    if (display && maze.dirty) {
+      pendingMaze = maze.grid.map(r => r.slice());
+      maze.dirty = false;
+    }
 
     let d1 = Infinity, d2 = Infinity;
     if (prey1.alive) {
@@ -98,7 +105,9 @@ async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config,
       if (++stepsSincePost >= stepsPerFrame) {
         stepsSincePost = 0;
         port.postMessage({ type: 'frame', idx, frame,
-          pred: snap(predator), prey: snap(prey1), prey2: snap(prey2) });
+          pred: snap(predator), prey: snap(prey1), prey2: snap(prey2),
+          maze: pendingMaze });
+        pendingMaze = null;
         await new Promise(resolve => setTimeout(resolve, 16));
       }
     } else if (display) {
@@ -106,7 +115,9 @@ async function runEpisode({ idx, genId, predW, prey1W, prey2W, mazeGrid, config,
       const now = Date.now();
       if (now - lastPost >= 16) {
         port.postMessage({ type: 'frame', idx, frame,
-          pred: snap(predator), prey: snap(prey1), prey2: snap(prey2) });
+          pred: snap(predator), prey: snap(prey1), prey2: snap(prey2),
+          maze: pendingMaze });
+        pendingMaze = null;
         lastPost = now;
       }
     }

@@ -1,4 +1,4 @@
-const CACHE = 'nnevo-v1.0.9';
+const CACHE = 'nnevo-v1.0.10';
 
 const ASSETS = [
   './',

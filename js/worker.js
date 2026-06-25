@@ -37,7 +37,8 @@ let ports       = [];   // direct MessagePort to each episode worker
 // ── Render / maze state ───────────────────────────────────────────────────
 let lastSnap    = null;        // { pred, prey, prey2 } from last display-worker frame
 let displayEp   = 0;           // episode index worker-0 is currently rendering
-let mazeSave    = null;         // baseline grid (2-D number array) — source of truth
+let mazeSave    = null;         // baseline grid (2-D number array) — canonical source of truth for episodes
+let displayMaze = null;         // mid-episode view: diverges from mazeSave when agents pick up/place walls
 let mazeDirty   = false;
 let mazeSAB     = null;         // SharedArrayBuffer for maze (one alloc, zero per-dispatch clones)
 let mazeShared  = null;         // Uint8Array view of mazeSAB
@@ -117,7 +118,10 @@ function _handleMessage(msg) {
 // ═══════════════════════════════════════════════════════════════════════════
 function _onEpisodeMsg(wIdx, data) {
   if (data.type === 'frame') {
-    if (wIdx === 0) lastSnap = { pred: data.pred, prey: data.prey, prey2: data.prey2 };
+    if (wIdx === 0) {
+      lastSnap = { pred: data.pred, prey: data.prey, prey2: data.prey2 };
+      if (data.maze) { displayMaze = data.maze; mazeDirty = true; }
+    }
     return;
   }
   if (data.type !== 'result') return;
@@ -263,7 +267,13 @@ function _reset() {
 function _dispatch(wIdx) {
   if (episodeQueue.length === 0) { workerBusy[wIdx] = false; return; }
   const epIdx = episodeQueue.shift();
-  if (wIdx === 0) displayEp = epIdx;
+  if (wIdx === 0) {
+    displayEp = epIdx;
+    // New episode: reset display maze to canonical so any wall changes from the
+    // previous episode are cleared before the next one begins.
+    displayMaze = null;
+    mazeDirty = true;
+  }
   workerBusy[wIdx] = true;
   ports[wIdx].postMessage({
     type:          'run',
@@ -362,8 +372,9 @@ function _flush() {
     totalFrames,
     history,
   };
-  if (mazeDirty && mazeSave) {
-    msg.maze = mazeSave.map(r => r.slice());
+  const mazeForDisplay = displayMaze || mazeSave;
+  if (mazeDirty && mazeForDisplay) {
+    msg.maze = mazeForDisplay.map(r => r.slice());
     mazeDirty = false;
   }
   self.postMessage(msg);
