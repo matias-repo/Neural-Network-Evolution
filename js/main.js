@@ -93,6 +93,8 @@ function init() {
     try {
       if (!lastState) return;
 
+      ui.history = lastState.history || [];
+
       const makeAgent = (s) => s ? {
         type: s.type, x: s.x, y: s.y,
         vx: s.vx, vy: s.vy, speed: s.speed,

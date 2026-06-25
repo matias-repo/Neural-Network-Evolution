@@ -12,6 +12,7 @@ class UI {
 
     this.numPredators = CONFIG.NUM_PREDATORS ?? 2;
     this.numPrey      = CONFIG.NUM_PREY      ?? 2;
+    this.history      = [];
 
     this._mouseDown = false;
     this._lastCell = null;
@@ -26,7 +27,12 @@ class UI {
   // ── Control bindings ──────────────────────────────────────────────────────
 
   _bindControls() {
-    this._on('btn-play-pause', 'click', () => this._togglePlayPause());
+    this._on('btn-play-pause',     'click', () => this._togglePlayPause());
+    this._on('btn-chart',          'click', () => this._showChartModal());
+    this._on('modal-chart-close',  'click', () => this._hideChartModal());
+    document.getElementById('modal-chart').addEventListener('click', e => {
+      if (e.target === e.currentTarget) this._hideChartModal();
+    });
     this._on('btn-reset',   'click', () => this._showResetModal());
     this._on('modal-cancel',  'click', () => this._hideResetModal());
     this._on('modal-confirm', 'click', () => { this._hideResetModal(); this.worker.postMessage({ type: 'reset' }); });
@@ -237,6 +243,15 @@ class UI {
 
     const bar = document.getElementById('edit-bar');
     if (bar) bar.classList.toggle('visible', this.mode === 'edit');
+  }
+
+  _showChartModal() {
+    document.getElementById('modal-chart').hidden = false;
+    this.renderer.drawChart(document.getElementById('chart-canvas'), this.history);
+  }
+
+  _hideChartModal() {
+    document.getElementById('modal-chart').hidden = true;
   }
 
   _cycleAgentCount(type) {
