@@ -5,9 +5,11 @@ class Renderer {
     this.ctx.imageSmoothingEnabled = false;  // keep pixels crisp
     this.showGrid = false;
 
-    // Pixels per sprite pixel.  Prey = 2 (20×20), Predator = 3 (30×30).
+    // Pixels per sprite pixel.  Both 20×20 so visual radius (10px) matches
+    // physics radius (7px) closely — eliminates visible wall-clipping on the
+    // predator sprite that occurred when PRED_SCALE was 3 (15px visual vs 7px physics).
     this.PREY_SCALE  = 2;
-    this.PRED_SCALE  = 3;
+    this.PRED_SCALE  = 2;
 
     // Distance thresholds for animation state switches
     this.FEAR_DIST  = 160;  // prey shows fear below this

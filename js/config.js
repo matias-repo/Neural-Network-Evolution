@@ -1,4 +1,4 @@
-const VERSION = '1.0.8';
+const VERSION = '1.0.9';
 
 const CONFIG = {
   // Grid – portrait 18×30 at 20 px = 360×600
@@ -56,7 +56,7 @@ const CONFIG = {
   // Wall interaction
   WALL_INTERACT_COOLDOWN: 20,    // sim-frames between pickups / placements
   WALL_CARRY_SPEED: 0.65,        // max-speed multiplier while holding a wall
-  WALL_INTERACT_THRESHOLD: 0.9,  // NN interact output must exceed this to trigger — prevents noise-driven pickups
+  WALL_INTERACT_THRESHOLD: 1.01, // above tanh max (1.0) — effectively disables wall pickup/place (avoids display desync bug)
   WALL_PICKUP_BONUS: 0,          // direct bonus removed — strategic use earns fitness through primary objectives
 
   // Canvas
